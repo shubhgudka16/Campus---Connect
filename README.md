@@ -16,7 +16,7 @@
 
 ---
 
-## 📌 About the Project
+##  About the Project
 
 **Campus Connect** is a modern web-based campus problem reporting and resolution portal designed to provide a structured workflow for handling problems reported within an educational institution.
 
@@ -26,7 +26,7 @@ The current implementation is a **frontend prototype with browser-based persiste
 
 ---
 
-## 🎯 Project Vision
+##  Project Vision
 
 Campus Connect aims to create a clear chain of responsibility for every campus problem.
 
@@ -64,7 +64,7 @@ The goal is simple:
 
 # ✨ Key Features
 
-## 👨‍🎓 Student Workspace
+##  Student Workspace
 
 Students can:
 
@@ -85,7 +85,7 @@ Students can:
 
 ---
 
-## 🛡️ Admin Workspace
+##  Admin Workspace
 
 The Admin dashboard provides centralized control over the complaint system.
 
@@ -106,7 +106,7 @@ The Admin dashboard provides centralized control over the complaint system.
 
 ---
 
-## 👨‍🏫 Faculty / Department Workspace
+##  Faculty / Department Workspace
 
 Faculty members act as the departmental coordinator between administration and technicians.
 
@@ -126,7 +126,7 @@ Faculty members act as the departmental coordinator between administration and t
 
 ---
 
-## 🔧 Technician Workspace
+##  Technician Workspace
 
 Technicians are responsible for completing the physical or technical work.
 
@@ -146,7 +146,7 @@ Technicians are responsible for completing the physical or technical work.
 
 ---
 
-# 🔄 Complete Complaint Resolution Workflow
+#  Complete Complaint Resolution Workflow
 
 Campus Connect implements a structured multi-stage workflow.
 
@@ -227,7 +227,7 @@ The completed complaint remains available as part of the system's resolution his
 
 ---
 
-# 🚨 Priority Detection
+#  Priority Detection
 
 The application includes keyword-based priority detection.
 
@@ -257,7 +257,7 @@ This mechanism helps demonstrate how complaints can be categorized based on the 
 
 ---
 
-# 📊 Dashboard & Analytics
+#  Dashboard & Analytics
 
 The Admin workspace includes visual analytics for monitoring the complaint system.
 
@@ -276,7 +276,7 @@ Charts are rendered using **Chart.js**.
 
 ---
 
-# 🌐 Public Transparency Feed
+#  Public Transparency Feed
 
 Campus Connect also includes a dedicated public feed.
 
@@ -286,7 +286,7 @@ This module is designed to demonstrate how institutions can provide greater visi
 
 ---
 
-# 🎨 User Interface
+#  User Interface
 
 The interface is designed around a modern dashboard-oriented visual system.
 
@@ -312,7 +312,7 @@ The interface is designed around a modern dashboard-oriented visual system.
 
 ---
 
-# 🌗 Light & Dark Mode
+#  Light & Dark Mode
 
 Campus Connect supports both:
 
@@ -325,7 +325,7 @@ The application also checks the user's system color preference when no saved the
 
 ---
 
-# 🔐 Session & Authentication Prototype
+#  Session & Authentication Prototype
 
 The current frontend includes a role-based authentication prototype.
 
@@ -342,7 +342,7 @@ The application uses browser-side state and local storage for the current protot
 
 ---
 
-# 💾 Data Persistence
+# Data Persistence
 
 The current prototype uses the browser's **localStorage** to persist application state.
 
@@ -362,7 +362,7 @@ This allows the frontend prototype to maintain state between page refreshes with
 
 ---
 
-# 🧪 Seeded Demo Data
+#  Seeded Demo Data
 
 The project includes pre-configured demonstration data for multiple departments and roles.
 
@@ -399,7 +399,7 @@ This makes the project immediately suitable for demonstrations and presentations
 
 ---
 
-# 🧩 Project Structure
+#  Project Structure
 
 ```text
 Campus---Connect/
@@ -447,7 +447,7 @@ Campus---Connect/
 
 ---
 
-# 📄 Main Pages
+#  Main Pages
 
 ## `index.html`
 
@@ -578,7 +578,7 @@ Provides frontend animation and interaction behavior.
 
 ---
 
-# 🛠️ Technologies Used
+#  Technologies Used
 
 | Technology           | Purpose                       |
 | -------------------- | ----------------------------- |
@@ -595,7 +595,7 @@ Provides frontend animation and interaction behavior.
 
 ---
 
-# 🚀 Getting Started
+#  Getting Started
 
 Because this version is a frontend application, no backend server or database installation is required to run the current prototype.
 
@@ -639,7 +639,7 @@ The application will open in the browser.
 
 ---
 
-# 💻 Recommended Environment
+#  Recommended Environment
 
 For the best experience:
 
@@ -653,7 +653,7 @@ A modern browser with JavaScript enabled is required.
 
 ---
 
-# 🧪 Testing & Validation
+#  Testing & Validation
 
 The project contains dedicated JavaScript-based workflow validation scripts inside the `scratch/` directory.
 
@@ -683,7 +683,7 @@ It verifies important application behavior without requiring a live backend.
 
 ---
 
-# 🔬 End-to-End Workflow Testing
+#  End-to-End Workflow Testing
 
 The project includes testing for a workflow similar to:
 
@@ -719,7 +719,7 @@ This makes the prototype suitable for demonstrating not only UI functionality bu
 
 ---
 
-# 📸 Screenshots
+#  Screenshots
 
 Recommended screenshots for the repository:
 
@@ -748,7 +748,7 @@ and reference them from this README.
 
 ---
 
-# 🔮 Future Development
+#  Future Development
 
 The current implementation is intentionally frontend-focused. The next major development phase can transform the prototype into a production-ready full-stack system.
 
@@ -802,7 +802,7 @@ Future versions can support:
 
 ---
 
-# 📈 Production Roadmap
+#  Production Roadmap
 
 ```text
 Current Prototype
@@ -831,7 +831,7 @@ Production Deployment
 
 ---
 
-# ⚠️ Current Limitations
+#  Current Limitations
 
 This repository currently represents a **frontend prototype**, therefore:
 
@@ -847,7 +847,7 @@ These limitations are intentional for the current development stage.
 
 ---
 
-# 🎓 Academic Context
+#  Academic Context
 
 **Project:** Campus Connect
 
@@ -863,20 +863,20 @@ These limitations are intentional for the current development stage.
 
 ---
 
-# 👥 Team
+#  Team
 
-| Member        | Responsibility                   |
-| ------------- | -------------------------------- |
-| Team Member 1 | Frontend / UI                    |
-| Team Member 2 | Backend / Future API Integration |
-| Team Member 3 | Database / System Integration    |
-| Team Member 4 | Testing / Documentation          |
+| Member        | Responsibility                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------|
+| Dev Koradia   | Frontend, Backend, Database, Future API Integration, System Integration, Testing and Documentation|
+| Shubh Gudka   | Frontend, Backend, Database, Future API Integration, System Integration, Testing and Documentation|
+| Nirav Katarmal| Frontend, Backend, Database, Future API Integration, System Integration, Testing and Documentation|
+| Darshan Mehta | Frontend, Backend, Database, Future API Integration, System Integration, Testing and Documentation|
 
-Replace the placeholders with the actual team member names.
+
 
 ---
 
-# 🤝 Development Workflow
+#  Development Workflow
 
 For collaborative development, each team member can work on a separate feature branch.
 
@@ -898,7 +898,7 @@ Then create a Pull Request for review before merging into the main branch.
 
 ---
 
-# 📌 Project Status
+#  Project Status
 
 **Current Status: Frontend Prototype**
 
@@ -936,7 +936,7 @@ This approach provides a clear record of who handled the complaint, what action 
 
 ---
 
-# 🏁 Conclusion
+#  Conclusion
 
 Campus Connect provides a structured digital approach to campus problem management.
 
