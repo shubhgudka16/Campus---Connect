@@ -1,7 +1,6 @@
 /* ==========================================================================
    Campus Connect - Aurora Portal Login Styles (login.css)
    ========================================================================== */
-
 .role-select-card {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   transform-style: preserve-3d;
