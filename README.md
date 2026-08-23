@@ -148,7 +148,7 @@ Technicians are responsible for completing the physical or technical work.
 
 #  Complete Complaint Resolution Workflow
 
-Campus Connect implements a structured multi-stage workflow.
+Campus Connect implements a structured multi-stage workflow..
 
 ### Stage 1: Complaint Submitted
 
