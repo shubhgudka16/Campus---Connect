@@ -1,7 +1,6 @@
 /* ==========================================================================
    Campus Connect - High-Speed Shared Navigation Engine (navigation.js)
    ========================================================================== */
-
 let lastScrollY = window.scrollY;
 let isHeaderHidden = false;
 const prefetchedUrls = new Set();
