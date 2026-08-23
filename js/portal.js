@@ -1,7 +1,6 @@
 /* ==========================================================================
    Campus Connect - 4-Step Resolution Portal Engine (portal.js)
    ========================================================================== */
-
 let tmpBase64Image = null;
 let tmpBase64Video = null;
 
