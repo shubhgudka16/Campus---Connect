@@ -1,7 +1,6 @@
 /* ==========================================================================
    Campus Connect - 3D Visual & Animation Engine (animations.js)
    ========================================================================== */
-
 let scrollObserver = null;
 
 /* ---------- SCROLL-BASED CONTENT REVEAL (INTERSECTION OBSERVER) ---------- */
