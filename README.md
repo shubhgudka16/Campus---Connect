@@ -1,4 +1,4 @@
-# Campus Connect
+# Campus Connect - A Centralized Problem Reporting and Resolution Portal 
 
 ### Automated Multi-Role Campus Problem Reporting & Resolution Portal
 
