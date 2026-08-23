@@ -1,7 +1,6 @@
 /* ==========================================================================
    Campus Connect - Role Portals & Workspaces Engine (roles.js)
    ========================================================================== */
-
 let tmpBase64Proof = null;
 
 function handleProofPhotoUpload(input) {
