@@ -1,7 +1,6 @@
 /* ==========================================================================
    Campus Connect - Public Transparency Feed Engine (feed.js)
    ========================================================================== */
-
 let activeFeedFilter = 'all';
 
 function filterPublicFeed(dept) {
