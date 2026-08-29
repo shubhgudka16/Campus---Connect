@@ -336,6 +336,10 @@ function getComplaintStageInfo(c) {
     stage = 7;
     statusText = 'Completed ✅';
     badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40';
+  } else if (status === 'Student Not Satisfied') {
+    stage = 7;
+    statusText = 'Student Not Satisfied';
+    badgeClass = 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40';
   }
 
   const percentMap = {
@@ -355,6 +359,80 @@ function getComplaintStageInfo(c) {
     statusText,
     badgeClass
   };
+}
+
+function getDaysPending(reportedAtStr) {
+  if (!reportedAtStr) return 0;
+  try {
+    const parts = String(reportedAtStr).trim().split(' ');
+    if (parts[0] && parts[0].includes('/')) {
+      const dParts = parts[0].split('/');
+      const day = parseInt(dParts[0], 10);
+      const month = parseInt(dParts[1], 10) - 1;
+      const year = parseInt(dParts[2], 10);
+      let hour = 0, min = 0;
+      if (parts[1]) {
+        const tParts = parts[1].split(':');
+        hour = parseInt(tParts[0], 10) || 0;
+        min = parseInt(tParts[1], 10) || 0;
+        if (parts[2] && parts[2].toUpperCase() === 'PM' && hour < 12) hour += 12;
+        if (parts[2] && parts[2].toUpperCase() === 'AM' && hour === 12) hour = 0;
+      }
+      const reportedDate = new Date(year, month, day, hour, min);
+      const diffMs = Date.now() - reportedDate.getTime();
+      return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    }
+    const d = new Date(reportedAtStr);
+    if (!isNaN(d.getTime())) {
+      const diffMs = Date.now() - d.getTime();
+      return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    }
+  } catch (e) {}
+  return 0;
+}
+
+function checkAdminReminders() {
+  if (!appState || !Array.isArray(appState.complaints)) return;
+  let changed = false;
+
+  appState.complaints.forEach(c => {
+    const isUnresolved = c.stage < 7 && c.status !== 'Completed' && !String(c.status).includes('Rejected');
+    if (!isUnresolved) return;
+
+    const days = getDaysPending(c.reportedAt);
+
+    if (days >= 15 && !c.notified15Day) {
+      c.notified15Day = true;
+      changed = true;
+      appState.notifs.unshift({
+        id: 'REM15-' + c.id + '-' + Date.now(),
+        forGr: null,
+        forDept: null,
+        forTech: null,
+        text: `Reminder: Complaint ${c.id} has been unresolved for 15 days. (Student: ${c.reportedBy}, Dept: ${c.category}, Title: "${c.title}", Status: ${c.status}, Technician: ${c.techName || 'Unassigned'}, Days Pending: ${days})`,
+        time: nowStr(),
+        read: false
+      });
+    }
+
+    if (days >= 30 && !c.notified30Day) {
+      c.notified30Day = true;
+      changed = true;
+      appState.notifs.unshift({
+        id: 'REM30-' + c.id + '-' + Date.now(),
+        forGr: null,
+        forDept: null,
+        forTech: null,
+        text: `Urgent Reminder: Complaint ${c.id} has been unresolved for 30 days. (Student: ${c.reportedBy}, Dept: ${c.category}, Title: "${c.title}", Status: ${c.status}, Technician: ${c.techName || 'Unassigned'}, Days Pending: ${days}) [30-Day Pending Urgent]`,
+        time: nowStr(),
+        read: false
+      });
+    }
+  });
+
+  if (changed) {
+    persist();
+  }
 }
 
 function normalizeComplaints(complaints) {
@@ -377,7 +455,7 @@ function normalizeComplaints(complaints) {
       else if (status === 'Work in Progress') stage = 4;
       else if (status === 'Work Completed by Technician') stage = 5;
       else if (status === 'Faculty Verified') stage = 6;
-      else if (status === 'Completed' || status === 'Completed ✅') stage = 7;
+      else if (status === 'Completed' || status === 'Completed ✅' || status === 'Student Not Satisfied') stage = 7;
       else if (status.includes('Rejected')) stage = 0;
       else stage = 1;
     }
@@ -414,6 +492,11 @@ function normalizeComplaints(complaints) {
       remark: c.remark || '',
       qaVerified: c.qaVerified || (stage >= 6),
       qaFeedback: c.qaFeedback || '',
+      feedback: c.feedback || null,
+      feedbackStatus: c.feedbackStatus || null,
+      feedbackTime: c.feedbackTime || null,
+      notified15Day: Boolean(c.notified15Day),
+      notified30Day: Boolean(c.notified30Day),
       logs: Array.isArray(c.logs) && c.logs.length ? c.logs : [
         { s: 'Complaint Submitted', note: 'Submitted with details', time: c.reportedAt || nowStr(), by: c.reportedBy || 'Student' }
       ]
@@ -430,11 +513,19 @@ function persist() { localStorage.setItem(REPO_KEY, JSON.stringify(appState)); }
 let currentSession = null;
 try {
   const savedSession = localStorage.getItem('campus_session');
+  const sessionActive = sessionStorage.getItem('campus_session_active');
   if (savedSession) {
-    currentSession = JSON.parse(savedSession);
-    if (currentSession && currentSession.expiresAt && currentSession.expiresAt <= Date.now()) {
+    if (!sessionActive) {
+      // Browser tab or window was closed and reopened -> clear session
       currentSession = null;
       localStorage.removeItem('campus_session');
+    } else {
+      currentSession = JSON.parse(savedSession);
+      if (currentSession && currentSession.expiresAt && currentSession.expiresAt <= Date.now()) {
+        currentSession = null;
+        localStorage.removeItem('campus_session');
+        sessionStorage.removeItem('campus_session_active');
+      }
     }
   }
 } catch (e) {
@@ -449,6 +540,8 @@ let sessionWatcherTimer = null;
 function logout(isAutoExpired = false) {
   currentSession = null;
   localStorage.removeItem('campus_session');
+  localStorage.removeItem('campus_hidden_timestamp');
+  sessionStorage.removeItem('campus_session_active');
   if (sessionWatcherTimer) clearInterval(sessionWatcherTimer);
 
   const timerBadge = document.getElementById('sessionTimerBadge');
@@ -469,22 +562,29 @@ function logout(isAutoExpired = false) {
     window.location.href = 'index.html';
   }
   if (isAutoExpired === true) {
-    toast('Your session has expired (15-Min SLA). Please sign in again.', 'err');
+    toast('Session ended. Please sign in again.', 'err');
   } else {
     toast('Logged out successfully');
   }
 }
 
+// Track background switching / leaving tab for a meaningful duration (> 5 min)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    localStorage.setItem('campus_hidden_timestamp', Date.now().toString());
+  } else if (document.visibilityState === 'visible') {
+    const hiddenTs = parseInt(localStorage.getItem('campus_hidden_timestamp') || '0', 10);
+    localStorage.removeItem('campus_hidden_timestamp');
+    if (hiddenTs && currentSession && (Date.now() - hiddenTs) > 5 * 60 * 1000) {
+      logout(true);
+    }
+  }
+});
 
 /* ---------- SESSION WATCHDOG ---------- */
 function runSessionTimer() {
   if (sessionWatcherTimer) clearInterval(sessionWatcherTimer);
-  const badge = document.getElementById('sessionTimerBadge');
-  const counter = document.getElementById('sessionCountdown');
-  if (!badge || !counter) return;
-
-  badge.classList.remove('hidden');
-  badge.classList.add('flex');
+  if (!currentSession || !currentSession.expiresAt) return;
 
   sessionWatcherTimer = setInterval(() => {
     if (!currentSession || !currentSession.expiresAt) {
@@ -496,27 +596,15 @@ function runSessionTimer() {
     if (remainingMs <= 0) {
       clearInterval(sessionWatcherTimer);
       logout(true);
-      return;
     }
-
-    const minutes = Math.floor(remainingMs / 60000);
-    const seconds = Math.floor((remainingMs % 60000) / 1000);
-    counter.innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-    if (remainingMs < 3 * 60 * 1000) {
-      badge.classList.remove('bg-amber-500/10', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400');
-      badge.classList.add('bg-red-600', 'text-white', 'animate-pulse');
-    } else {
-      badge.classList.remove('bg-red-600', 'text-white', 'animate-pulse');
-      badge.classList.add('bg-amber-500/10', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400');
-    }
-  }, 1000);
+  }, 5000);
 }
 
 
 /* ---------- GENERAL UTILS & TOASTS ---------- */
 function toast(msg, category = 'ok') {
   const box = document.getElementById('toastBox');
+  if (!box) return;
   const el = document.createElement('div');
   el.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-xl text-sm font-semibold border backdrop-blur-md ${category === 'err' ? 'bg-red-50 dark:bg-red-950/60 border-red-200 text-red-700 dark:text-red-300' : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'}`;
   el.innerHTML = `<i class="fa-solid ${category === 'err' ? 'fa-circle-xmark text-red-500' : 'fa-circle-check text-emerald-600'} mr-2"></i>${msg}`;
@@ -710,6 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (currentSession) {
     runSessionTimer();
   }
+  checkAdminReminders();
 
   document.addEventListener('click', e => {
     if (!e.target.closest('#notifWrap')) {
