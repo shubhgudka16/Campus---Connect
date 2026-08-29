@@ -1,4 +1,4 @@
-# Campus Connect
+# Campus Connect - A Centralized Problem Reporting and Resolution Portal 
 <p align="center">
   <img src="assets/logo/logo.png" alt="Campus Connect Logo" width="90">
 </p>
