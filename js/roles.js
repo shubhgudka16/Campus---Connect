@@ -143,19 +143,28 @@ function renderStudent() {
   const stuDeptBig = document.getElementById('stuDeptBig');
   if (stuDeptBig) stuDeptBig.innerText = currentSession?.dept || 'Department';
 
-  const myTickets = (appState.complaints || []).filter(c => 
+  const allMyTickets = (appState.complaints || []).filter(c => 
     (currentSession && currentSession.grNo && c.reportedByGr === currentSession.grNo) ||
     (currentSession && currentSession.name && c.reportedBy === currentSession.name)
   );
 
+  const sQuery = (document.getElementById('stuSearch')?.value || '').trim().toLowerCase();
+  let myTickets = allMyTickets;
+  if (sQuery) {
+    myTickets = allMyTickets.filter(c => {
+      const matchText = [c.title, c.description, c.category, c.location, c.id, c.status, c.techName, c.remark, c.priority].filter(Boolean).join(' ').toLowerCase();
+      return matchText.includes(sQuery);
+    });
+  }
+
   const sTotal = document.getElementById('sTotal');
-  if (sTotal) sTotal.innerText = myTickets.length;
+  if (sTotal) sTotal.innerText = allMyTickets.length;
   const sPending = document.getElementById('sPending');
-  if (sPending) sPending.innerText = myTickets.filter(c => c.stage === 1 || c.status === 'Complaint Submitted').length;
+  if (sPending) sPending.innerText = allMyTickets.filter(c => c.stage === 1 || c.status === 'Complaint Submitted').length;
   const sActive = document.getElementById('sActive');
-  if (sActive) sActive.innerText = myTickets.filter(c => c.stage >= 2 && c.stage <= 6).length;
+  if (sActive) sActive.innerText = allMyTickets.filter(c => c.stage >= 2 && c.stage <= 6).length;
   const sClosed = document.getElementById('sClosed');
-  if (sClosed) sClosed.innerText = myTickets.filter(c => c.stage === 7 || c.status === 'Completed').length;
+  if (sClosed) sClosed.innerText = allMyTickets.filter(c => c.stage === 7 || c.status === 'Completed').length;
 
   const list = document.getElementById('stuList');
   list.innerHTML = '';
@@ -163,16 +172,68 @@ function renderStudent() {
     list.innerHTML = `
       <div class="bg-white dark:bg-zinc-900 border border-dashed rounded-[20px] p-12 text-center">
         <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-3"></i>
-        <div class="font-bold">No registered complaints</div>
-        <button onclick="openComplaintModal()" class="mt-4 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold text-xs">+ Register Complaint</button>
+        <div class="font-bold">${sQuery ? `No complaints found matching "${sQuery}"` : 'No registered complaints'}</div>
+        ${sQuery ? `<button onclick="document.getElementById('stuSearch').value=''; renderStudent();" class="mt-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs font-semibold hover:bg-slate-200">Clear Search</button>` : `<button onclick="openComplaintModal()" class="mt-4 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold text-xs">+ Register Complaint</button>`}
       </div>`;
     return;
   }
 
   myTickets.forEach((c, index) => {
     const stageInfo = getComplaintStageInfo(c);
-    const isCompleted = stageInfo.stage === 7;
+    const isCompleted = stageInfo.stage === 7 || c.status === 'Completed' || c.status === 'Student Not Satisfied';
     const isRejected = stageInfo.isRejected;
+
+    let feedbackHtml = '';
+    if (isCompleted || c.status === 'Completed' || c.status === 'Student Not Satisfied' || c.stage === 7) {
+      if (!c.feedback) {
+        feedbackHtml = `
+          <div class="mt-3 p-4 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-2xl space-y-3">
+            <div>
+              <b class="text-xs text-slate-800 dark:text-zinc-200 font-bold flex items-center gap-1.5"><i class="fa-solid fa-star-half-stroke text-amber-500"></i> Was your complaint resolved satisfactorily?</b>
+              <p class="text-[11px] text-slate-500 mt-0.5">Please share your experience with the resolution quality.</p>
+            </div>
+            <div class="space-y-2.5">
+              <div class="flex flex-wrap gap-4 text-xs font-semibold text-slate-700 dark:text-zinc-200">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="fbOpt_${c.id}" value="Satisfied" id="fbSat_${c.id}" class="accent-emerald-600 h-4 w-4 cursor-pointer" checked>
+                  <span class="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold"><i class="fa-solid fa-thumbs-up"></i> Satisfied</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="fbOpt_${c.id}" value="Not Satisfied" id="fbNotSat_${c.id}" class="accent-red-600 h-4 w-4 cursor-pointer">
+                  <span class="flex items-center gap-1 text-red-700 dark:text-red-300 font-bold"><i class="fa-solid fa-thumbs-down"></i> Not Satisfied</span>
+                </label>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-zinc-400 block mb-1">Add a comment (optional)</label>
+                <textarea id="fbComment_${c.id}" rows="2" placeholder="Tell us about your experience..." class="w-full px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs text-slate-800 dark:text-zinc-200 outline-none"></textarea>
+              </div>
+              <button onclick="submitStudentFeedbackWithComment('${c.id}')" class="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold text-xs shadow-md transition hover:opacity-90">
+                Submit Feedback
+              </button>
+            </div>
+          </div>`;
+      } else if (c.feedback === 'Satisfied') {
+        feedbackHtml = `
+          <div class="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-500/20 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-sm mt-0.5 shrink-0"></i>
+            <div>
+              <b class="font-bold">Feedback: Satisfied</b> — Thank you for your feedback.
+              ${c.feedbackComment ? `<p class="text-[11px] text-slate-600 dark:text-zinc-300 mt-1 italic">"${c.feedbackComment}"</p>` : ''}
+              <span class="text-[10px] text-slate-400 block mt-0.5">${c.feedbackTime || ''}</span>
+            </div>
+          </div>`;
+      } else if (c.feedback === 'Not Satisfied') {
+        feedbackHtml = `
+          <div class="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
+            <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm mt-0.5 shrink-0"></i>
+            <div>
+              <b class="font-bold">Feedback: Student Not Satisfied</b> — Admin has been notified for rework review.
+              ${c.feedbackComment ? `<p class="text-[11px] text-slate-600 dark:text-zinc-300 mt-1 italic">"${c.feedbackComment}"</p>` : ''}
+              <span class="text-[10px] text-slate-400 block mt-0.5">${c.feedbackTime || ''}</span>
+            </div>
+          </div>`;
+      }
+    }
 
     const stepDefinitions = [
       { num: 1, label: '1. Submitted', full: 'Complaint Submitted', icon: 'fa-file-circle-plus' },
@@ -212,9 +273,9 @@ function renderStudent() {
 
     const card = document.createElement('div');
     const delayClass = `delay-${((index % 4) + 1) * 100}`;
-    card.className = `bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-[24px] p-5 card-hover reveal-on-scroll ${delayClass}`;
+    card.className = `bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-[24px] p-5 card-hover reveal-on-scroll overflow-hidden ${delayClass}`;
     card.innerHTML = `
-      <div class="flex flex-col lg:flex-row gap-5">
+      <div class="flex flex-col lg:flex-row gap-5 min-w-0">
         <div class="w-full lg:w-64 rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border shrink-0 flex flex-col gap-2 p-2">
           <div class="relative h-32 w-full rounded-xl overflow-hidden">
             <img src="${c.image}" class="w-full h-full object-cover cursor-pointer" onclick="openLightbox('${c.image}', '${c.title}')">
@@ -225,7 +286,7 @@ function renderStudent() {
           ` : ''}
         </div>
         
-        <div class="flex-1 space-y-3">
+        <div class="flex-1 min-w-0 space-y-3">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-[11px] font-mono font-bold text-slate-500">${c.id} • ${c.reportedAt}</span>
             <span class="px-2.5 py-1 rounded-full text-[11px] font-bold border ${stageInfo.badgeClass}">${stageInfo.statusText}</span>
@@ -270,6 +331,9 @@ function renderStudent() {
               <b class="font-bold"><i class="fa-solid fa-circle-xmark mr-1"></i> Rejected by ${stageInfo.rejectedBy}:</b> "${c.rejectionReason || 'Complaint rejected.'}"
             </div>
           ` : ''}
+
+          <!-- Feedback Section for Solved Complaints -->
+          ${feedbackHtml}
 
           <!-- 7-Stage Interactive Progress Bar -->
           <div class="space-y-2.5 pt-3 border-t border-slate-100 dark:border-zinc-800">
@@ -319,6 +383,62 @@ function renderStudent() {
   if (typeof initScrollObserver === 'function') setTimeout(initScrollObserver, 50);
 }
 
+function submitStudentFeedbackWithComment(id) {
+  const c = appState.complaints.find(x => x.id === id);
+  if (!c) return;
+
+  const satRadio = document.getElementById(`fbSat_${id}`);
+  const feedback = (satRadio && satRadio.checked) ? 'Satisfied' : 'Not Satisfied';
+  const comment = (document.getElementById(`fbComment_${id}`)?.value || '').trim();
+
+  submitStudentFeedback(id, feedback, comment);
+}
+
+function submitStudentFeedback(id, feedback, comment = '') {
+  const c = appState.complaints.find(x => x.id === id);
+  if (!c) return;
+
+  c.feedback = feedback;
+  c.feedbackComment = comment || c.feedbackComment || '';
+  c.feedbackTime = nowStr();
+
+  if (feedback === 'Satisfied') {
+    c.feedbackStatus = 'Satisfied';
+    c.logs.push({ 
+      s: 'Student Feedback', 
+      note: `Student confirmed satisfied.${c.feedbackComment ? ` Remark: "${c.feedbackComment}"` : ''}`, 
+      time: nowStr(), 
+      by: c.reportedBy 
+    });
+    toast('Thank you for your feedback.');
+  } else {
+    c.feedbackStatus = 'Student Not Satisfied';
+    c.status = 'Student Not Satisfied';
+    c.current_status = 'Student Not Satisfied';
+    c.logs.push({ 
+      s: 'Student Feedback', 
+      note: `Student reported: Not Satisfied.${c.feedbackComment ? ` Remark: "${c.feedbackComment}"` : ''}`, 
+      time: nowStr(), 
+      by: c.reportedBy 
+    });
+
+    appState.notifs.unshift({
+      id: 'N' + Date.now(),
+      forGr: null,
+      forDept: null,
+      forTech: null,
+      text: `Feedback Alert: Complaint ${c.id} - Student ${c.reportedBy} (GR: ${c.reportedByGr}, ${c.category}) is Not Satisfied with "${c.title}" (Technician: ${c.techName || 'Unassigned'}). Feedback status: Not Satisfied.${c.feedbackComment ? ` Comment: "${c.feedbackComment}"` : ''}`,
+      time: nowStr(),
+      read: false
+    });
+
+    toast('Feedback recorded. Admin has been notified.', 'err');
+  }
+
+  persist();
+  renderStudent();
+}
+
 
 /* ==========================================================================
    2. ADMIN VERIFICATION & GOVERNANCE DASHBOARD
@@ -346,6 +466,7 @@ function switchAdmin(tab) {
 function renderAdmin() {
   showView('admin');
   if (typeof syncNavProfile === 'function') syncNavProfile();
+  if (typeof checkAdminReminders === 'function') checkAdminReminders();
 
   const total = appState.complaints.length;
   const aTotal = document.getElementById('aTotal');
@@ -436,22 +557,32 @@ function drawCharts() {
 }
 
 function renderAdminTickets() {
-  const search = document.getElementById('ticketSearch')?.value.toLowerCase() || '';
-  let list = appState.complaints.filter(c => c.status === 'Complaint Submitted' || c.admin_status === 'Pending' || c.stage === 1);
+  const search = (document.getElementById('ticketSearch')?.value || '').trim().toLowerCase();
+  let list = appState.complaints.filter(c => 
+    c.status === 'Complaint Submitted' || 
+    c.admin_status === 'Pending' || 
+    c.stage === 1 ||
+    c.status === 'Student Not Satisfied' ||
+    c.feedback === 'Not Satisfied'
+  );
 
   if (search) {
-    list = list.filter(c => (c.title + ' ' + c.id + ' ' + c.location).toLowerCase().includes(search));
+    list = list.filter(c => {
+      const matchText = [c.title, c.description, c.category, c.location, c.id, c.techName, c.reportedBy, c.reportedByGr, c.status, c.priority, c.remark].filter(Boolean).join(' ').toLowerCase();
+      return matchText.includes(search);
+    });
   }
 
   const grid = document.getElementById('adminTicketGrid');
   if (!grid) return;
   grid.innerHTML = '';
   if (list.length === 0) {
-    grid.innerHTML = '<div class="col-span-full p-12 text-center text-slate-500">No inbound student complaints awaiting Admin verification.</div>';
+    grid.innerHTML = `<div class="col-span-full p-12 text-center text-slate-500 font-medium">No complaints found${search ? ` matching "${search}"` : ' awaiting Admin verification'}.</div>`;
     return;
   }
 
   list.forEach((c, index) => {
+    const isFeedbackRework = c.status === 'Student Not Satisfied' || c.feedback === 'Not Satisfied';
     const el = document.createElement('div');
     const delayClass = `delay-${((index % 4) + 1) * 100}`;
     el.className = `border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-900 flex flex-col justify-between reveal-on-scroll ${delayClass}`;
@@ -462,14 +593,23 @@ function renderAdminTickets() {
             <span class="text-[10px] font-mono text-slate-500">${c.id} • ${c.reportedAt}</span>
             <h4 class="font-bold text-base mt-0.5">${c.title}</h4>
           </div>
-          <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Awaiting Admin Verification</span>
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${isFeedbackRework ? 'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-amber-100 text-amber-800 border border-amber-200'}">
+            ${isFeedbackRework ? 'Student Not Satisfied (Rework)' : 'Awaiting Admin Verification'}
+          </span>
         </div>
-        <p class="text-xs text-slate-500">Filer: <b>${c.reportedBy} (${c.reportedByGr})</b> | Target Dept: <b>${c.category}</b></p>
+        <p class="text-xs text-slate-500">Filer: <b>${c.reportedBy} (${c.reportedByGr})</b> | Target Dept: <b>${c.category}</b> | Tech: <b>${c.techName || 'None'}</b></p>
         <div class="text-sm bg-slate-50 dark:bg-zinc-800 p-3 rounded-xl border">${c.description}</div>
+        ${isFeedbackRework ? `
+          <div class="p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-xl text-xs">
+            <i class="fa-solid fa-triangle-exclamation mr-1"></i> Student reported <b>Not Satisfied</b> with resolution. Review issue and dispatch back to Faculty for technician rework.
+          </div>
+        ` : ''}
       </div>
       
       <div class="mt-4 flex gap-2 shrink-0">
-        <button onclick="openAdminRouteModal('${c.id}')" class="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md"><i class="fa-solid fa-shield-check mr-1"></i> Verify & Assign to Faculty</button>
+        <button onclick="openAdminRouteModal('${c.id}')" class="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md">
+          <i class="fa-solid ${isFeedbackRework ? 'fa-rotate-left' : 'fa-shield-check'} mr-1"></i> ${isFeedbackRework ? 'Send Back to Faculty' : 'Verify & Assign to Faculty'}
+        </button>
         <button onclick="openLightbox('${c.image}', '${c.title}')" class="px-3 py-2 rounded-xl border text-xs font-semibold hover:bg-slate-50 dark:hover:bg-zinc-800">Inspect Evidence</button>
         ${c.video ? `<button onclick="openLightbox('${c.video}', '${c.title}', 'video')" class="px-3 py-2 rounded-xl bg-violet-50 text-violet-700 text-xs font-bold hover:bg-violet-100">Watch Video</button>` : ''}
       </div>
@@ -504,6 +644,8 @@ function confirmAdminDispatch(e) {
   const c = appState.complaints.find(x => x.id === id);
   if (!c) return;
 
+  const wasRework = Boolean(c.feedback === 'Not Satisfied' || c.status === 'Student Not Satisfied');
+
   c.category = dept;
   c.status = 'Assigned to Faculty';
   c.current_status = 'Assigned to Faculty';
@@ -513,22 +655,33 @@ function confirmAdminDispatch(e) {
   c.faculty_status = 'Pending';
   c.technician_status = 'Pending';
   c.work_status = 'Not Started';
+  c.feedback = null;
+  c.feedbackStatus = null;
 
-  c.logs.push({ s: 'Admin Verified', note: `Approved by Admin & assigned to ${dept} Faculty Advisor`, time: nowStr(), by: 'Admin Office' });
+  c.logs.push({ 
+    s: 'Admin Verified', 
+    note: wasRework
+      ? `Sent back by Admin to ${dept} Faculty Advisor for rework & technician reassignment`
+      : `Approved by Admin & assigned to ${dept} Faculty Advisor`, 
+    time: nowStr(), 
+    by: 'Admin Office' 
+  });
 
   appState.notifs.unshift({
     id: 'N' + Date.now(),
     forGr: c.reportedByGr,
     forDept: dept,
     forTech: null,
-    text: `Admin verified complaint ${c.id} and assigned to ${dept} Faculty.`,
+    text: wasRework
+      ? `Admin sent complaint ${c.id} back to ${dept} Faculty for rework.`
+      : `Admin verified complaint ${c.id} and assigned to ${dept} Faculty.`,
     time: nowStr(),
     read: false
   });
 
   persist();
   closeAdminRouteModal();
-  toast(`Complaint ${c.id} verified & assigned to ${dept} Faculty.`);
+  toast(wasRework ? `Complaint ${c.id} sent back to ${dept} Faculty for rework.` : `Complaint ${c.id} verified & assigned to ${dept} Faculty.`);
   renderAdmin();
 }
 
@@ -564,18 +717,21 @@ function adminRejectTicket() {
 }
 
 function renderAdminFinalTickets() {
-  const search = document.getElementById('finalSearch')?.value.toLowerCase() || '';
+  const search = (document.getElementById('finalSearch')?.value || '').trim().toLowerCase();
   let list = appState.complaints.filter(c => c.stage === 6 || c.status === 'Faculty Verified' || (c.faculty_status === 'Verified' && c.stage < 7));
 
   if (search) {
-    list = list.filter(c => (c.title + ' ' + c.id + ' ' + c.location + ' ' + (c.techName || '')).toLowerCase().includes(search));
+    list = list.filter(c => {
+      const matchText = [c.title, c.description, c.category, c.location, c.id, c.techName, c.reportedBy, c.reportedByGr, c.status, c.priority, c.remark, c.qaFeedback].filter(Boolean).join(' ').toLowerCase();
+      return matchText.includes(search);
+    });
   }
 
   const grid = document.getElementById('adminFinalGrid');
   if (!grid) return;
   grid.innerHTML = '';
   if (list.length === 0) {
-    grid.innerHTML = '<div class="col-span-full p-12 text-center text-slate-500">No faculty-verified complaints awaiting Admin final verification & sign-off.</div>';
+    grid.innerHTML = `<div class="col-span-full p-12 text-center text-slate-500 font-medium">No complaints found${search ? ` matching "${search}"` : ' awaiting Admin final sign-off'}.</div>`;
     return;
   }
 
@@ -672,22 +828,31 @@ function renderTechnician() {
   if (typeof syncNavProfile === 'function') syncNavProfile();
 
   const currentTechId = currentSession ? (currentSession.techId || currentSession.id) : null;
-  const list = appState.complaints.filter(c => 
+  const allList = appState.complaints.filter(c => 
     (c.techId === currentTechId || (!c.techId && c.category === currentSession?.dept)) && 
     c.stage >= 3 &&
     c.status !== 'Rejected by Admin' &&
     c.status !== 'Rejected by Faculty'
   );
+
+  const techQuery = (document.getElementById('techSearch')?.value || '').trim().toLowerCase();
+  let list = allList;
+  if (techQuery) {
+    list = allList.filter(c => {
+      const matchText = [c.title, c.description, c.category, c.location, c.id, c.priority, c.status, c.deadline, c.remark, c.reportedBy, c.reportedByGr].filter(Boolean).join(' ').toLowerCase();
+      return matchText.includes(techQuery);
+    });
+  }
   
   const techCountBadge = document.getElementById('techCountBadge');
-  if (techCountBadge) techCountBadge.innerText = list.length + ' tasks assigned';
+  if (techCountBadge) techCountBadge.innerText = allList.length + ' tasks assigned';
 
   const container = document.getElementById('technicianList');
   if (!container) return;
   container.innerHTML = '';
 
   if (list.length === 0) {
-    container.innerHTML = '<div class="col-span-full p-12 text-center text-slate-500">No active work orders dispatched to your profile.</div>';
+    container.innerHTML = `<div class="col-span-full p-12 text-center text-slate-500 font-medium">No complaints found${techQuery ? ` matching "${techQuery}"` : ' dispatched to your profile'}.</div>`;
     return;
   }
 
@@ -920,28 +1085,32 @@ function renderFaculty() {
   
   const header = document.getElementById('facDeptHeader');
   if (header) header.innerText = (currentSession.dept || 'Department') + ' Operations & QA Panel';
-  const query = document.getElementById('facSearch')?.value.toLowerCase() || '';
+  const query = (document.getElementById('facSearch')?.value || '').trim().toLowerCase();
 
   // Faculty receives complaints assigned by Admin to their department, plus tech-completed work
-  let list = appState.complaints.filter(c => 
+  const allList = appState.complaints.filter(c => 
     (c.category === currentSession.dept || !currentSession.dept) && 
     c.stage >= 2 &&
     c.status !== 'Rejected by Admin'
   );
   
+  let list = allList;
   if (query) {
-    list = list.filter(c => (c.title + ' ' + c.id + ' ' + c.location + ' ' + (c.techName || '')).toLowerCase().includes(query));
+    list = allList.filter(c => {
+      const matchText = [c.title, c.description, c.category, c.location, c.id, c.techName, c.status, c.remark, c.priority, c.reportedBy, c.reportedByGr, c.qaFeedback].filter(Boolean).join(' ').toLowerCase();
+      return matchText.includes(query);
+    });
   }
 
   const facCountBadge = document.getElementById('facCountBadge');
-  if (facCountBadge) facCountBadge.innerText = list.length + ' department tickets';
+  if (facCountBadge) facCountBadge.innerText = allList.length + ' department tickets';
 
   const grid = document.getElementById('facultyList');
   if (!grid) return;
   grid.innerHTML = '';
 
   if (list.length === 0) {
-    grid.innerHTML = '<div class="col-span-full p-12 text-center text-slate-500">No active complaints assigned to your department.</div>';
+    grid.innerHTML = `<div class="col-span-full p-12 text-center text-slate-500 font-medium">No complaints found${query ? ` matching "${query}"` : ' assigned to your department'}.</div>`;
     return;
   }
 
@@ -1384,28 +1553,108 @@ function toggleStudentSuspendStatus(gr) {
    6. AUDITED REPORTS & EXPORTS
    ========================================================================== */
 function renderReports() {
-  const body = document.getElementById('reportBody');
-  if (!body) return;
-  body.innerHTML = '';
-  appState.complaints.forEach(c => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="p-3 font-semibold">${c.id}</td>
-      <td class="p-3 text-xs"><b>${c.reportedBy}</b><span class="block text-slate-400">GR: ${c.reportedByGr}</span></td>
-      <td class="p-3 text-xs">${c.category}</td>
-      <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 border text-slate-700">${c.status}</span></td>
-      <td class="p-3 text-xs">${c.techName || 'Unassigned'}</td>
-      <td class="p-3 text-xs">${c.qaVerified ? 'Faculty QA Approved' : 'Awaiting Inspection'}</td>
-      <td class="p-3 font-mono text-xs">15 Min SLA Standard</td>
-    `;
-    body.appendChild(tr);
-  });
+  const techFilter = document.getElementById('reportFilterTech');
+  if (techFilter) {
+    const curVal = techFilter.value;
+    techFilter.innerHTML = '<option value="All">All Technicians</option>';
+    appState.technicians.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = `${t.name} (${t.dept})`;
+      techFilter.appendChild(opt);
+    });
+    if (curVal) techFilter.value = curVal;
+  }
+
+  const filterStatus = document.getElementById('reportFilterStatus')?.value || 'All';
+  const filterDept = document.getElementById('reportFilterDept')?.value || 'All';
+  const filterTech = document.getElementById('reportFilterTech')?.value || 'All';
+  const filterPending = document.getElementById('reportFilterPending')?.value || 'All';
+
+  let filtered = (appState.complaints || []).slice();
+
+  if (filterStatus !== 'All') {
+    filtered = filtered.filter(c => c.status === filterStatus || c.current_status === filterStatus);
+  }
+  if (filterDept !== 'All') {
+    filtered = filtered.filter(c => c.category === filterDept);
+  }
+  if (filterTech !== 'All') {
+    filtered = filtered.filter(c => c.techName === filterTech);
+  }
+  if (filterPending === 'Unsolved') {
+    filtered = filtered.filter(c => c.stage < 7 && c.status !== 'Completed');
+  } else if (filterPending === 'Solved') {
+    filtered = filtered.filter(c => c.stage === 7 || c.status === 'Completed');
+  }
+
+  const solvedList = filtered.filter(c => c.stage === 7 || c.status === 'Completed');
+  const pendingList = filtered.filter(c => c.stage < 7 && c.status !== 'Completed');
+
+  // Render Solved Table
+  const solvedBody = document.getElementById('reportSolvedBody');
+  const solvedCount = document.getElementById('countReportSolved');
+  if (solvedCount) solvedCount.innerText = solvedList.length;
+  if (solvedBody) {
+    solvedBody.innerHTML = '';
+    if (solvedList.length === 0) {
+      solvedBody.innerHTML = '<tr><td colspan="9" class="p-6 text-center text-xs text-slate-400">No solved complaints match the selected filter.</td></tr>';
+    } else {
+      solvedList.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition';
+        tr.innerHTML = `
+          <td class="p-3 font-mono font-bold text-xs">${c.id}</td>
+          <td class="p-3 text-xs font-semibold">${c.reportedBy}</td>
+          <td class="p-3 text-xs font-mono text-slate-500">${c.reportedByGr}</td>
+          <td class="p-3 text-xs">${c.category}</td>
+          <td class="p-3 text-xs font-medium max-w-xs truncate" title="${c.title}">${c.title}</td>
+          <td class="p-3 text-xs">${c.techName || 'Unassigned'}</td>
+          <td class="p-3 text-xs text-slate-500">${c.reportedAt}</td>
+          <td class="p-3 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">${c.admin_final_date || c.technician_completion_date || c.reportedAt}</td>
+          <td class="p-3"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40">${c.status}</span></td>
+        `;
+        solvedBody.appendChild(tr);
+      });
+    }
+  }
+
+  // Render Pending Table
+  const pendingBody = document.getElementById('reportPendingBody');
+  const pendingCount = document.getElementById('countReportPending');
+  if (pendingCount) pendingCount.innerText = pendingList.length;
+  if (pendingBody) {
+    pendingBody.innerHTML = '';
+    if (pendingList.length === 0) {
+      pendingBody.innerHTML = '<tr><td colspan="9" class="p-6 text-center text-xs text-slate-400">No pending / unsolved complaints match the selected filter.</td></tr>';
+    } else {
+      pendingList.forEach(c => {
+        const days = typeof getDaysPending === 'function' ? getDaysPending(c.reportedAt) : 0;
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition';
+        tr.innerHTML = `
+          <td class="p-3 font-mono font-bold text-xs">${c.id}</td>
+          <td class="p-3 text-xs font-semibold">${c.reportedBy}</td>
+          <td class="p-3 text-xs font-mono text-slate-500">${c.reportedByGr}</td>
+          <td class="p-3 text-xs">${c.category}</td>
+          <td class="p-3 text-xs font-medium max-w-xs truncate" title="${c.title}">${c.title}</td>
+          <td class="p-3 text-xs">${c.techName || '<span class="text-slate-400">Not Assigned</span>'}</td>
+          <td class="p-3 text-xs text-slate-500">${c.reportedAt}</td>
+          <td class="p-3 text-xs font-mono font-bold ${days >= 30 ? 'text-red-600 dark:text-red-400' : (days >= 15 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-zinc-300')}">${days} day${days === 1 ? '' : 's'}</td>
+          <td class="p-3"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40">${c.status}</span></td>
+        `;
+        pendingBody.appendChild(tr);
+      });
+    }
+  }
 }
 
 function exportCSV() {
-  let csv = 'ID,Filer Name,GR No,Department,Status,Stage,Technician Dispatch,Inspection Verified,Deadline\n';
+  let csv = 'Complaint ID,Student Name,Enrollment GR,Department,Complaint Title,Technician,Date Reported,Date Solved,Days Pending,Current Status,Feedback\n';
   appState.complaints.forEach(c => {
-    csv += `"${c.id}","${c.reportedBy}","${c.reportedByGr}","${c.category}","${c.status}","${c.stage || 1}","${c.techName || ''}","${c.qaVerified ? 'Yes' : 'No'}","${c.deadline || ''}"\n`;
+    const days = typeof getDaysPending === 'function' ? getDaysPending(c.reportedAt) : 0;
+    const solvedDate = (c.stage === 7 || c.status === 'Completed') ? (c.admin_final_date || c.technician_completion_date || c.reportedAt) : 'N/A';
+    csv += `"${c.id}","${c.reportedBy}","${c.reportedByGr}","${c.category}","${(c.title || '').replace(/"/g, '""')}","${c.techName || ''}","${c.reportedAt}","${solvedDate}","${days}","${c.status}","${c.feedback || ''}"\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);

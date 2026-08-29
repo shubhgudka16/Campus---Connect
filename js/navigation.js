@@ -39,32 +39,36 @@ function initInstantPrefetch() {
   });
 }
 
-/* ---------- DYNAMIC NAVBAR SCROLL PHYSICS ---------- */
+/* ---------- DYNAMIC NAVBAR SCROLL & PROGRESS BAR ---------- */
 function initDynamicNavbarAndScroll() {
   const header = document.getElementById('main-header');
-  if (!header) return;
+  
+  // Ensure thin scroll progress bar exists
+  let bar = document.getElementById('scrollProgressBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'scrollProgressBar';
+    bar.className = 'fixed top-0 left-0 h-[3px] bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 z-50 transition-all duration-75 w-0 pointer-events-none';
+    document.body.prepend(bar);
+  }
 
   let ticking = false;
 
   function handleScroll() {
-    const currentScrollY = window.scrollY;
-    const scrollDelta = currentScrollY - lastScrollY;
+    const currentScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    const docHeight = (document.documentElement.scrollHeight || document.body.scrollHeight) - window.innerHeight;
+    const progress = docHeight > 0 ? Math.min(100, Math.max(0, (currentScrollY / docHeight) * 100)) : 0;
+    
+    if (bar) bar.style.width = `${progress}%`;
 
-    if (scrollDelta > 8 && currentScrollY > 90 && !isHeaderHidden) {
-      header.classList.add('navbar-hidden');
-      isHeaderHidden = true;
-    } else if ((scrollDelta < -6 || currentScrollY <= 40) && isHeaderHidden) {
-      header.classList.remove('navbar-hidden');
-      isHeaderHidden = false;
+    if (header) {
+      if (currentScrollY > 10) {
+        header.classList.add('shadow-md');
+      } else {
+        header.classList.remove('shadow-md');
+      }
     }
 
-    if (currentScrollY > 20) {
-      header.classList.add('shadow-md');
-    } else {
-      header.classList.remove('shadow-md');
-    }
-
-    lastScrollY = Math.max(0, currentScrollY);
     ticking = false;
   }
 
@@ -74,6 +78,9 @@ function initDynamicNavbarAndScroll() {
       ticking = true;
     }
   }, { passive: true });
+
+  // Initial calculation
+  handleScroll();
 }
 
 /* ---------- ACTIVE NAVBAR STATE DETECTION ---------- */

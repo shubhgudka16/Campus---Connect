@@ -28,6 +28,7 @@ function loginStudent(e) {
 
   currentSession = { role: 'student', grNo: u.grNo, name: u.name, dept: u.dept, avatar: u.avatar || null, expiresAt: Date.now() + SESSION_SLA_MS };
   localStorage.setItem('campus_session', JSON.stringify(currentSession));
+  sessionStorage.setItem('campus_session_active', '1');
   toast(`Welcome ${u.name}`);
   runSessionTimer();
   const params = new URLSearchParams(window.location.search);
@@ -47,6 +48,7 @@ function loginFaculty(e) {
 
   currentSession = { role: 'faculty', name: dept + ' Faculty', dept: dept, expiresAt: Date.now() + SESSION_SLA_MS };
   localStorage.setItem('campus_session', JSON.stringify(currentSession));
+  sessionStorage.setItem('campus_session_active', '1');
   toast(`Faculty authorized: ${dept}`);
   runSessionTimer();
   setTimeout(() => {
@@ -64,6 +66,7 @@ function loginTechnician(e) {
 
   currentSession = { role: 'technician', id: t.id, techId: t.id, name: t.name, dept: t.dept, expiresAt: Date.now() + SESSION_SLA_MS };
   localStorage.setItem('campus_session', JSON.stringify(currentSession));
+  sessionStorage.setItem('campus_session_active', '1');
   toast(`Technician session open: ${t.name}`);
   runSessionTimer();
   setTimeout(() => {
@@ -79,6 +82,7 @@ function loginAdmin(e) {
 
   currentSession = { role: 'admin', username: 'admin', name: 'Principal Office Workspace', expiresAt: Date.now() + SESSION_SLA_MS };
   localStorage.setItem('campus_session', JSON.stringify(currentSession));
+  sessionStorage.setItem('campus_session_active', '1');
   toast('Admin terminal unlocked');
   runSessionTimer();
   setTimeout(() => {
@@ -89,16 +93,22 @@ function loginAdmin(e) {
 function logout(isAutoExpired = false) {
   currentSession = null;
   localStorage.removeItem('campus_session');
+  localStorage.removeItem('campus_hidden_timestamp');
+  sessionStorage.removeItem('campus_session_active');
   if (sessionWatcherTimer) clearInterval(sessionWatcherTimer);
 
-  document.getElementById('sessionTimerBadge').classList.add('hidden');
-  document.getElementById('userChip').classList.add('hidden');
-  document.getElementById('notifWrap').classList.add('hidden');
-  document.getElementById('navRightAuthSlot').classList.remove('hidden');
+  const timerBadge = document.getElementById('sessionTimerBadge');
+  if (timerBadge) timerBadge.classList.add('hidden');
+  const userChip = document.getElementById('userChip');
+  if (userChip) userChip.classList.add('hidden');
+  const notifWrap = document.getElementById('notifWrap');
+  if (notifWrap) notifWrap.classList.add('hidden');
+  const authSlot = document.getElementById('navRightAuthSlot');
+  if (authSlot) authSlot.classList.remove('hidden');
   
   goHome();
   if (isAutoExpired === true) {
-    toast('Your session has expired (15-Min SLA). Please sign in again.', 'err');
+    toast('Session ended. Please sign in again.', 'err');
   } else {
     toast('Logged out successfully');
   }
@@ -114,7 +124,7 @@ function handleRegister(e) {
   const dept = document.getElementById('regDept').value.trim();
   const pass = document.getElementById('regPass').value;
 
-  if (appState.users.some(u => u.grNo === gr)) return toast('G.R. Number registered already', 'err');
+  if (appState.users.some(u => u.grNo === gr)) return toast('Enrollment Number registered already', 'err');
   appState.users.push({ grNo: gr, name, dept, password: pass, avatar: null, warned: false, suspended: false });
   persist();
   closeRegister();

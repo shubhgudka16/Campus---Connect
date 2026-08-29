@@ -123,12 +123,6 @@
       </div>
 
       <div id="userChip" class="hidden items-center gap-3">
-        <!-- Live Countdown Timer -->
-        <div id="sessionTimerBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 font-mono text-sm font-bold transition">
-          <i class="fa-solid fa-stopwatch animate-pulse"></i>
-          <span id="sessionCountdown">15:00</span>
-        </div>
-
         <div class="text-right leading-tight hidden sm:block">
           <div id="chipName" class="text-base font-bold text-slate-800 dark:text-zinc-200"></div>
           <div id="chipRole" class="text-xs text-slate-500 dark:text-zinc-400"></div>
@@ -318,8 +312,14 @@
     <div class="flex justify-between items-center mb-4"><h3 class="font-display font-bold text-lg">Register Student Account</h3><button onclick="closeRegister()" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button></div>
     <form onsubmit="handleRegister(event)" class="space-y-3">
       <input id="regName" required placeholder="Full Name" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border text-sm">
-      <input id="regGr" required placeholder="G.R. Number" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border text-sm">
-      <input id="regDept" required placeholder="Department / Class (e.g. Computer Science)" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border text-sm">
+      <input id="regGr" required placeholder="Enrollment Number" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border text-sm">
+      <select id="regDept" required class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border text-sm">
+        <option value="" disabled selected>Select Department</option>
+        <option value="Computer Department">Computer Department</option>
+        <option value="Electrical Department">Electrical Department</option>
+        <option value="Mechanical Department">Mechanical Department</option>
+        <option value="Civil Department">Civil Department</option>
+      </select>
       <input id="regPass" required type="password" placeholder="Account Password" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border text-sm">
       <button class="w-full py-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold text-sm btn-3d">Verify & Create</button>
     </form>
