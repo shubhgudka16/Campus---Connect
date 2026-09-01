@@ -18,79 +18,122 @@ function switchRole(r) {
   });
 }
 
-function loginStudent(e) {
+async function loginStudent(e) {
   e.preventDefault();
   const gr = document.getElementById('stuGr').value.trim();
   const pass = document.getElementById('stuPass').value;
-  const u = appState.users.find(x => x.grNo === gr && x.password === pass);
-  if (!u) return toast('Invalid G.R. Number or Password', 'err');
-  if (u.suspended) return toast('Your account is suspended. Contact Principal Office.', 'err');
-
-  currentSession = { role: 'student', grNo: u.grNo, name: u.name, dept: u.dept, avatar: u.avatar || null, expiresAt: Date.now() + SESSION_SLA_MS };
-  localStorage.setItem('campus_session', JSON.stringify(currentSession));
-  sessionStorage.setItem('campus_session_active', '1');
-  toast(`Welcome ${u.name}`);
-  runSessionTimer();
-  const params = new URLSearchParams(window.location.search);
-  const action = params.get('action');
-  const actionQuery = action ? `&action=${encodeURIComponent(action)}` : '';
-  setTimeout(() => {
-    window.location.href = `roles.html?role=student${actionQuery}`;
-  }, 400);
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'student', stuGr: gr, stuPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Invalid G.R. Number or Password', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast(`Welcome ${currentSession.name}`);
+    runSessionTimer();
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const actionQuery = action ? `&action=${encodeURIComponent(action)}` : '';
+    setTimeout(() => {
+      window.location.href = `roles.html?role=student${actionQuery}`;
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
 }
 
-function loginFaculty(e) {
+async function loginFaculty(e) {
   e.preventDefault();
   const dept = document.getElementById('facDeptInput').value;
   const pass = document.getElementById('facPass').value;
-  const f = appState.faculties.find(x => x.dept === dept && x.password === pass);
-  if (!f) return toast('Invalid Faculty Credentials', 'err');
-
-  currentSession = { role: 'faculty', name: dept + ' Faculty', dept: dept, expiresAt: Date.now() + SESSION_SLA_MS };
-  localStorage.setItem('campus_session', JSON.stringify(currentSession));
-  sessionStorage.setItem('campus_session_active', '1');
-  toast(`Faculty authorized: ${dept}`);
-  runSessionTimer();
-  setTimeout(() => {
-    window.location.href = 'roles.html?role=faculty';
-  }, 400);
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'faculty', facDept: dept, facPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Invalid Faculty Credentials', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast(`Faculty authorized: ${dept}`);
+    runSessionTimer();
+    setTimeout(() => {
+      window.location.href = 'roles.html?role=faculty';
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
 }
 
-function loginTechnician(e) {
+async function loginTechnician(e) {
   e.preventDefault();
   const id = document.getElementById('techId').value.trim().toUpperCase();
   const pass = document.getElementById('techPass').value;
-  const t = appState.technicians.find(x => x.id === id && x.password === pass);
-  if (!t) return toast('Invalid Technician credentials', 'err');
-  if (!t.active) return toast('This technician account has been deactivated.', 'err');
-
-  currentSession = { role: 'technician', id: t.id, techId: t.id, name: t.name, dept: t.dept, expiresAt: Date.now() + SESSION_SLA_MS };
-  localStorage.setItem('campus_session', JSON.stringify(currentSession));
-  sessionStorage.setItem('campus_session_active', '1');
-  toast(`Technician session open: ${t.name}`);
-  runSessionTimer();
-  setTimeout(() => {
-    window.location.href = 'roles.html?role=technician';
-  }, 400);
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'technician', techId: id, techPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Invalid Technician credentials', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast(`Technician session open: ${currentSession.name}`);
+    runSessionTimer();
+    setTimeout(() => {
+      window.location.href = 'roles.html?role=technician';
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
 }
 
-function loginAdmin(e) {
+async function loginAdmin(e) {
   e.preventDefault();
   const user = document.getElementById('adminUser').value.trim();
   const pass = document.getElementById('adminPass').value;
-  if (user !== 'admin' || pass !== 'admin123') return toast('Admin Credentials Invalid', 'err');
-
-  currentSession = { role: 'admin', username: 'admin', name: 'Principal Office Workspace', expiresAt: Date.now() + SESSION_SLA_MS };
-  localStorage.setItem('campus_session', JSON.stringify(currentSession));
-  sessionStorage.setItem('campus_session_active', '1');
-  toast('Admin terminal unlocked');
-  runSessionTimer();
-  setTimeout(() => {
-    window.location.href = 'roles.html?role=admin';
-  }, 400);
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'admin', adminUser: user, adminPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Admin Credentials Invalid', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast('Admin terminal unlocked');
+    runSessionTimer();
+    setTimeout(() => {
+      window.location.href = 'roles.html?role=admin';
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
 }
 
-function logout(isAutoExpired = false) {
+async function logout(isAutoExpired = false) {
+  try {
+    await fetch('backend/auth/logout.php', { method: 'POST' });
+  } catch (e) {}
+
   currentSession = null;
   localStorage.removeItem('campus_session');
   localStorage.removeItem('campus_hidden_timestamp');
@@ -117,19 +160,30 @@ function logout(isAutoExpired = false) {
 function openRegister() { document.getElementById('modalRegister').classList.remove('hidden'); }
 function closeRegister() { document.getElementById('modalRegister').classList.add('hidden'); }
 
-function handleRegister(e) {
+async function handleRegister(e) {
   e.preventDefault();
   const name = document.getElementById('regName').value.trim();
   const gr = document.getElementById('regGr').value.trim();
   const dept = document.getElementById('regDept').value.trim();
   const pass = document.getElementById('regPass').value;
 
-  if (appState.users.some(u => u.grNo === gr)) return toast('Enrollment Number registered already', 'err');
-  appState.users.push({ grNo: gr, name, dept, password: pass, avatar: null, warned: false, suspended: false });
-  persist();
-  closeRegister();
-  toast('Student account generated! Log in below.');
-  document.getElementById('stuGr').value = gr;
+  try {
+    const res = await fetch('backend/auth/register.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ regName: name, regGr: gr, regDept: dept, regPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Registration failed', 'err');
+    }
+    closeRegister();
+    toast('Student account generated! Log in below.');
+    document.getElementById('stuGr').value = gr;
+    document.getElementById('stuPass').value = '';
+  } catch (err) {
+    toast('Registration failed. Please try again.', 'err');
+  }
 }
 
 function showView(viewId) {

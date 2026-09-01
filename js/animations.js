@@ -126,11 +126,21 @@ function animateValue(obj, start, end, duration) {
 }
 
 /* ---------- LANDING STATS & USER STATE RENDERER ---------- */
-function renderLandingStats() {
+async function renderLandingStats() {
   if (typeof appState === 'undefined') return;
 
+  if (!appState.complaints || appState.complaints.length === 0) {
+    try {
+      const res = await fetch('backend/complaints/list.php?public=1');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        appState.complaints = data.data;
+      }
+    } catch (e) {}
+  }
+
   const total = (appState.complaints || []).length;
-  const cleared = (appState.complaints || []).filter(c => c.status === 'Perfectly Completed').length;
+  const cleared = (appState.complaints || []).filter(c => c.status === 'Completed' || c.status === 'Perfectly Completed' || c.stage === 7).length;
   
   const statTotal = document.getElementById('lStatTotal');
   const statCleared = document.getElementById('lStatCleared');
