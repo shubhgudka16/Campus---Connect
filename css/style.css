@@ -347,55 +347,109 @@ body {
 }
 
 /* ==========================================================================
-   Scroll Reveal Animation System
+   Ronnsquare-Inspired Cinematic Scroll Animation System (GSAP & Lenis)
    ========================================================================== */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* When GSAP handles transforms, disable CSS transition conflicts for frame-perfect motion */
+html.gsap-loaded .reveal-on-scroll,
+html.gsap-loaded .reveal-scale,
+html.gsap-loaded .reveal-slide-left,
+html.gsap-loaded .reveal-slide-right {
+  transition: none !important;
+}
+
+/* Text Masking & Reveals (Ronnsquare Style) */
+.text-mask-reveal {
+  overflow: hidden;
+  display: block;
+}
+
+.text-mask-reveal-inner {
+  display: block;
+  will-change: transform, opacity;
+}
+
 .reveal-on-scroll {
-  opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: var(--scroll-opacity, 0);
+  transform: translate3d(var(--scroll-tx, 0px), var(--scroll-ty, 28px), var(--scroll-tz, 0px)) 
+             scale3d(var(--scroll-scale, 0.96), var(--scroll-scale, 0.96), 1) 
+             rotateX(var(--scroll-rx, 3deg));
+  transition: opacity 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+              transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
   will-change: opacity, transform;
+  transform-origin: center center;
 }
 
 .reveal-on-scroll.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+  --scroll-opacity: 1;
+  --scroll-ty: 0px;
+  --scroll-tx: 0px;
+  --scroll-tz: 0px;
+  --scroll-scale: 1;
+  --scroll-rx: 0deg;
 }
 
 .reveal-scale {
-  opacity: 0;
-  transform: scale(0.95);
-  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: var(--scroll-opacity, 0);
+  transform: translate3d(0, var(--scroll-ty, 22px), 0) scale(var(--scroll-scale, 0.94));
+  transition: opacity 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+              transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
   will-change: opacity, transform;
 }
 .reveal-scale.is-visible {
-  opacity: 1;
-  transform: scale(1);
+  --scroll-opacity: 1;
+  --scroll-scale: 1;
+  --scroll-ty: 0px;
 }
 
 .reveal-slide-left {
-  opacity: 0;
-  transform: translateX(-24px);
-  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: var(--scroll-opacity, 0);
+  transform: translate3d(var(--scroll-tx, -32px), 0, 0);
+  transition: opacity 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+              transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
   will-change: opacity, transform;
 }
 .reveal-slide-left.is-visible {
-  opacity: 1;
-  transform: translateX(0);
+  --scroll-opacity: 1;
+  --scroll-tx: 0px;
 }
 
 .reveal-slide-right {
-  opacity: 0;
-  transform: translateX(24px);
-  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: var(--scroll-opacity, 0);
+  transform: translate3d(var(--scroll-tx, 32px), 0, 0);
+  transition: opacity 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+              transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
   will-change: opacity, transform;
 }
 .reveal-slide-right.is-visible {
-  opacity: 1;
-  transform: translateX(0);
+  --scroll-opacity: 1;
+  --scroll-tx: 0px;
+}
+
+/* Scrubbed Parallax Image Layer */
+.parallax-img {
+  will-change: transform;
+  transform: translate3d(0, var(--parallax-y, 0px), 0) scale(var(--parallax-scale, 1));
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Stagger Delay Utility Classes */

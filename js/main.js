@@ -537,7 +537,11 @@ let tmpBase64ProfileAvatar = null;
 let qaApprovalState = true;
 let sessionWatcherTimer = null;
 
-function logout(isAutoExpired = false) {
+async function logout(isAutoExpired = false) {
+  try {
+    await fetch('backend/auth/logout.php', { method: 'POST' });
+  } catch (e) {}
+
   currentSession = null;
   localStorage.removeItem('campus_session');
   localStorage.removeItem('campus_hidden_timestamp');
@@ -664,7 +668,7 @@ function handleProfileImgUpload(input) {
   }; r.readAsDataURL(file);
 }
 
-function saveProfile(e) {
+async function saveProfile(e) {
   e.preventDefault();
   const name = document.getElementById('profName').value.trim();
   const dept = document.getElementById('profDept').value.trim();
@@ -672,17 +676,42 @@ function saveProfile(e) {
   const url = document.getElementById('profImgUrl').value.trim();
   let finalAvatar = url || tmpBase64ProfileAvatar || null;
 
-  if (currentSession.role === 'student') {
-    const u = appState.users.find(x => x.grNo === currentSession.grNo);
-    if (u) { u.name = name; u.dept = dept; u.password = pass; u.avatar = finalAvatar; persist(); }
-    currentSession.name = name; currentSession.dept = dept; currentSession.avatar = finalAvatar;
-  } else if (currentSession.role === 'technician') {
-    const t = appState.technicians.find(x => x.id === currentSession.techId);
-    if (t) { t.name = name; t.dept = dept; t.password = pass; persist(); }
-    currentSession.name = name; currentSession.dept = dept;
+  try {
+    const res = await fetch('backend/profile/update.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        dept,
+        password: pass,
+        avatar: finalAvatar
+      })
+    });
+    const data = await res.json();
+    if (data.success && data.data && data.data.session) {
+      currentSession = data.data.session;
+      localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    } else {
+      if (currentSession.role === 'student') {
+        const u = appState.users.find(x => x.grNo === currentSession.grNo);
+        if (u) { u.name = name; u.dept = dept; u.password = pass; u.avatar = finalAvatar; persist(); }
+        currentSession.name = name; currentSession.dept = dept; currentSession.avatar = finalAvatar;
+      } else if (currentSession.role === 'technician') {
+        const t = appState.technicians.find(x => x.id === currentSession.techId);
+        if (t) { t.name = name; t.dept = dept; t.password = pass; persist(); }
+        currentSession.name = name; currentSession.dept = dept;
+      }
+      localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    }
+  } catch (err) {
+    if (currentSession.role === 'student') {
+      const u = appState.users.find(x => x.grNo === currentSession.grNo);
+      if (u) { u.name = name; u.dept = dept; u.password = pass; u.avatar = finalAvatar; persist(); }
+      currentSession.name = name; currentSession.dept = dept; currentSession.avatar = finalAvatar;
+    }
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
   }
   
-  localStorage.setItem('campus_session', JSON.stringify(currentSession));
   closeProfileModal();
   toast('Profile updated successfully!');
   if (typeof syncNavProfile === 'function') syncNavProfile();
@@ -693,24 +722,36 @@ function saveProfile(e) {
 /* ---------- LIVE NOTIFICATIONS WORKSPACE ---------- */
 function toggleNotif() { document.getElementById('notifDrop').classList.toggle('hidden'); }
 
-function renderNotifs() {
+async function renderNotifs() {
   if (!currentSession) return;
   let notifications = [];
   
-  if (currentSession.role === 'student') {
-    notifications = appState.notifs.filter(n => n.forGr === currentSession.grNo || n.forGr === null);
-  } else if (currentSession.role === 'faculty') {
-    notifications = appState.notifs.filter(n => n.forDept === currentSession.dept || n.forDept === null);
-  } else if (currentSession.role === 'technician') {
-    notifications = appState.notifs.filter(n => n.forTech === currentSession.techId || n.forTech === null);
-  } else {
-    notifications = appState.notifs;
+  try {
+    const res = await fetch('backend/notifications/list.php');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      notifications = data.data;
+      appState.notifs = notifications;
+    } else {
+      notifications = appState.notifs || [];
+    }
+  } catch (e) {
+    if (currentSession.role === 'student') {
+      notifications = appState.notifs.filter(n => n.forGr === currentSession.grNo || n.forGr === null);
+    } else if (currentSession.role === 'faculty') {
+      notifications = appState.notifs.filter(n => n.forDept === currentSession.dept || n.forDept === null);
+    } else if (currentSession.role === 'technician') {
+      notifications = appState.notifs.filter(n => n.forTech === currentSession.techId || n.forTech === null);
+    } else {
+      notifications = appState.notifs;
+    }
   }
 
   const unreadCount = notifications.filter(n => !n.read).length;
   document.getElementById('notifDot').classList.toggle('hidden', unreadCount === 0);
 
   const container = document.getElementById('notifList');
+  if (!container) return;
   container.innerHTML = '';
   
   if (notifications.length === 0) {
@@ -726,13 +767,14 @@ function renderNotifs() {
   });
 }
 
-function markAllRead() {
+async function markAllRead() {
   if (!currentSession) return;
-  appState.notifs.forEach(n => {
-    if (currentSession.role === 'student' && (n.forGr === currentSession.grNo || n.forGr === null)) n.read = true;
-    if (currentSession.role === 'faculty' && (n.forDept === currentSession.dept || n.forDept === null)) n.read = true;
-    if (currentSession.role === 'technician' && (n.forTech === currentSession.techId || n.forTech === null)) n.read = true;
-    if (currentSession.role === 'admin') n.read = true;
+  try {
+    await fetch('backend/notifications/read_all.php', { method: 'POST' });
+  } catch (e) {}
+
+  (appState.notifs || []).forEach(n => {
+    n.read = true;
   });
   persist();
   renderNotifs();

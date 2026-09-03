@@ -14,13 +14,28 @@ function filterPublicFeed(dept) {
   renderPublicFeed(activeFeedFilter);
 }
 
-function renderPublicFeed(filter = 'all') {
+async function renderPublicFeed(filter = 'all') {
   const grid = document.getElementById('publicFeedGrid');
   if (!grid) return;
   
-  let list = (typeof appState !== 'undefined' && appState.complaints) ? appState.complaints : [];
-  if (filter !== 'all') {
-    list = list.filter(c => c.category === filter || c.dept === filter);
+  let list = [];
+  try {
+    const categoryParam = filter !== 'all' ? `&category=${encodeURIComponent(filter)}` : '';
+    const res = await fetch(`backend/complaints/list.php?public=1${categoryParam}`);
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      list = data.data;
+    } else {
+      list = (typeof appState !== 'undefined' && appState.complaints) ? appState.complaints : [];
+      if (filter !== 'all') {
+        list = list.filter(c => c.category === filter || c.dept === filter);
+      }
+    }
+  } catch (e) {
+    list = (typeof appState !== 'undefined' && appState.complaints) ? appState.complaints : [];
+    if (filter !== 'all') {
+      list = list.filter(c => c.category === filter || c.dept === filter);
+    }
   }
 
   if (list.length === 0) {

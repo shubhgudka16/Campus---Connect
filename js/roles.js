@@ -43,7 +43,7 @@ function showRoleView(viewId) {
     }
   });
 
-  if (viewId === 'student') renderStudent();
+  if (viewId === 'student') renderStudent(true);
   if (viewId === 'faculty') renderFaculty();
   if (viewId === 'technician') renderTechnician();
   if (viewId === 'admin') renderAdmin();
@@ -56,10 +56,24 @@ function showRoleView(viewId) {
   }
 }
 
-function renderByRole() {
+async function renderByRole() {
   const params = new URLSearchParams(window.location.search);
   const roleParam = params.get('role');
   const actionParam = params.get('action');
+
+  // Verify and sync with active PHP backend session
+  try {
+    const sessRes = await fetch('backend/auth/session.php');
+    if (sessRes.ok) {
+      const sessData = await sessRes.json();
+      if (sessData.success && sessData.data?.session) {
+        currentSession = sessData.data.session;
+        localStorage.setItem('campus_session', JSON.stringify(currentSession));
+        sessionStorage.setItem('campus_session_active', '1');
+        if (typeof syncNavProfile === 'function') syncNavProfile();
+      }
+    }
+  } catch (e) {}
 
   if (roleParam && ['student', 'faculty', 'technician', 'admin'].includes(roleParam)) {
     if (!currentSession || currentSession.role !== roleParam) {
@@ -107,9 +121,24 @@ function handleRoleActionParam(action) {
 /* ==========================================================================
    1. STUDENT VIEW & 7-STAGE PROGRESS BAR
    ========================================================================== */
-function renderStudent() {
+async function renderStudent(forceFetch = true) {
   showView('student');
   if (typeof syncNavProfile === 'function') syncNavProfile();
+
+  // Retrieve student complaints directly from MySQL database
+  if (forceFetch) {
+    try {
+      const res = await fetch('backend/complaints/list.php?role=student');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          appState.complaints = data.data;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch student complaints from MySQL:', err);
+    }
+  }
 
   const warningWrap = document.getElementById('studentWarningContainer');
   if (warningWrap) {
@@ -143,8 +172,9 @@ function renderStudent() {
   if (stuDeptBig) stuDeptBig.innerText = currentSession?.dept || 'Department';
 
   const allMyTickets = (appState.complaints || []).filter(c => 
-    (currentSession && currentSession.grNo && c.reportedByGr === currentSession.grNo) ||
-    (currentSession && currentSession.name && c.reportedBy === currentSession.name)
+    !currentSession || !currentSession.grNo ||
+    c.reportedByGr === currentSession.grNo || 
+    c.reportedBy === currentSession.name
   );
 
   const sQuery = (document.getElementById('stuSearch')?.value || '').trim().toLowerCase();
@@ -172,7 +202,7 @@ function renderStudent() {
       <div class="bg-white dark:bg-zinc-900 border border-dashed rounded-[20px] p-12 text-center">
         <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-3"></i>
         <div class="font-bold">${sQuery ? `No complaints found matching "${sQuery}"` : 'No registered complaints'}</div>
-        ${sQuery ? `<button onclick="document.getElementById('stuSearch').value=''; renderStudent();" class="mt-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs font-semibold hover:bg-slate-200">Clear Search</button>` : `<button onclick="openComplaintModal()" class="mt-4 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold text-xs">+ Register Complaint</button>`}
+        ${sQuery ? `<button onclick="document.getElementById('stuSearch').value=''; renderStudent(false);" class="mt-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs font-semibold hover:bg-slate-200">Clear Search</button>` : `<button onclick="openComplaintModal()" class="mt-4 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold text-xs">+ Register Complaint</button>`}
       </div>`;
     return;
   }
@@ -383,9 +413,6 @@ function renderStudent() {
 }
 
 function submitStudentFeedbackWithComment(id) {
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
-
   const satRadio = document.getElementById(`fbSat_${id}`);
   const feedback = (satRadio && satRadio.checked) ? 'Satisfied' : 'Not Satisfied';
   const comment = (document.getElementById(`fbComment_${id}`)?.value || '').trim();
@@ -393,49 +420,40 @@ function submitStudentFeedbackWithComment(id) {
   submitStudentFeedback(id, feedback, comment);
 }
 
-function submitStudentFeedback(id, feedback, comment = '') {
+async function submitStudentFeedback(id, feedback, comment = '') {
   const c = appState.complaints.find(x => x.id === id);
   if (!c) return;
 
-  c.feedback = feedback;
-  c.feedbackComment = comment || c.feedbackComment || '';
-  c.feedbackTime = nowStr();
-
-  if (feedback === 'Satisfied') {
-    c.feedbackStatus = 'Satisfied';
-    c.logs.push({ 
-      s: 'Student Feedback', 
-      note: `Student confirmed satisfied.${c.feedbackComment ? ` Remark: "${c.feedbackComment}"` : ''}`, 
-      time: nowStr(), 
-      by: c.reportedBy 
+  try {
+    const res = await fetch('backend/complaints/feedback.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, feedback, comment })
     });
-    toast('Thank you for your feedback.');
-  } else {
-    c.feedbackStatus = 'Student Not Satisfied';
-    c.status = 'Student Not Satisfied';
-    c.current_status = 'Student Not Satisfied';
-    c.logs.push({ 
-      s: 'Student Feedback', 
-      note: `Student reported: Not Satisfied.${c.feedbackComment ? ` Remark: "${c.feedbackComment}"` : ''}`, 
-      time: nowStr(), 
-      by: c.reportedBy 
-    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Error recording feedback', 'err');
+    }
 
-    appState.notifs.unshift({
-      id: 'N' + Date.now(),
-      forGr: null,
-      forDept: null,
-      forTech: null,
-      text: `Feedback Alert: Complaint ${c.id} - Student ${c.reportedBy} (GR: ${c.reportedByGr}, ${c.category}) is Not Satisfied with "${c.title}" (Technician: ${c.techName || 'Unassigned'}). Feedback status: Not Satisfied.${c.feedbackComment ? ` Comment: "${c.feedbackComment}"` : ''}`,
-      time: nowStr(),
-      read: false
-    });
+    c.feedback = feedback;
+    c.feedbackComment = comment || c.feedbackComment || '';
+    c.feedbackTime = (data.data && data.data.feedbackTime) ? data.data.feedbackTime : nowStr();
 
-    toast('Feedback recorded. Admin has been notified.', 'err');
+    if (feedback === 'Satisfied') {
+      c.feedbackStatus = 'Satisfied';
+      toast('Thank you for your feedback.');
+    } else {
+      c.feedbackStatus = 'Student Not Satisfied';
+      c.status = 'Student Not Satisfied';
+      c.current_status = 'Student Not Satisfied';
+      toast('Feedback recorded. Admin has been notified for rework review.', 'err');
+    }
+
+    persist();
+    await renderStudent(true);
+  } catch (err) {
+    toast('Error saving feedback.', 'err');
   }
-
-  persist();
-  renderStudent();
 }
 
 
@@ -462,26 +480,53 @@ function switchAdmin(tab) {
   if (tab === 'reports') renderReports();
 }
 
-function renderAdmin() {
+async function renderAdmin() {
   showView('admin');
   if (typeof syncNavProfile === 'function') syncNavProfile();
   if (typeof checkAdminReminders === 'function') checkAdminReminders();
 
-  const total = appState.complaints.length;
-  const aTotal = document.getElementById('aTotal');
-  if (aTotal) aTotal.innerText = total;
-  const closed = appState.complaints.filter(c => c.stage === 7 || c.status === 'Completed').length;
-  const aRate = document.getElementById('aRate');
-  if (aRate) aRate.innerText = total ? Math.round(closed / total * 100) + '%' : '0%';
-  const aAvg = document.getElementById('aAvg');
-  if (aAvg) aAvg.innerText = '15 Mins';
-  
-  const ratedTechs = appState.technicians.filter(t => t.rating > 0);
-  const avgSat = ratedTechs.length ? (ratedTechs.reduce((a, b) => a + b.rating, 0) / ratedTechs.length).toFixed(1) : '5.0';
-  const aSat = document.getElementById('aSat');
-  if (aSat) aSat.innerText = avgSat + '★';
-  const aStaff = document.getElementById('aStaff');
-  if (aStaff) aStaff.innerText = appState.technicians.filter(t => t.active).length;
+  try {
+    const [compRes, dashRes] = await Promise.all([
+      fetch('backend/complaints/list.php?role=admin'),
+      fetch('backend/admin/dashboard.php')
+    ]);
+    const compData = await compRes.json();
+    const dashData = await dashRes.json();
+
+    if (compData.success && Array.isArray(compData.data)) {
+      appState.complaints = compData.data;
+    }
+
+    if (dashData.success && dashData.data) {
+      const d = dashData.data;
+      const aTotal = document.getElementById('aTotal');
+      if (aTotal) aTotal.innerText = d.total;
+      const aRate = document.getElementById('aRate');
+      if (aRate) aRate.innerText = d.resolutionRate;
+      const aAvg = document.getElementById('aAvg');
+      if (aAvg) aAvg.innerText = d.avgSla;
+      const aSat = document.getElementById('aSat');
+      if (aSat) aSat.innerText = d.avgRating;
+      const aStaff = document.getElementById('aStaff');
+      if (aStaff) aStaff.innerText = d.activeStaff;
+    }
+  } catch (e) {
+    const total = appState.complaints.length;
+    const aTotal = document.getElementById('aTotal');
+    if (aTotal) aTotal.innerText = total;
+    const closed = appState.complaints.filter(c => c.stage === 7 || c.status === 'Completed').length;
+    const aRate = document.getElementById('aRate');
+    if (aRate) aRate.innerText = total ? Math.round(closed / total * 100) + '%' : '0%';
+    const aAvg = document.getElementById('aAvg');
+    if (aAvg) aAvg.innerText = '15 Mins';
+    
+    const ratedTechs = (appState.technicians || []).filter(t => t.rating > 0);
+    const avgSat = ratedTechs.length ? (ratedTechs.reduce((a, b) => a + b.rating, 0) / ratedTechs.length).toFixed(1) : '5.0';
+    const aSat = document.getElementById('aSat');
+    if (aSat) aSat.innerText = avgSat + '★';
+    const aStaff = document.getElementById('aStaff');
+    if (aStaff) aStaff.innerText = (appState.technicians || []).filter(t => t.active).length;
+  }
 
   drawCharts();
   renderAdminTickets();
@@ -635,84 +680,45 @@ function openAdminRouteModal(id) {
 
 function closeAdminRouteModal() { document.getElementById('modalAdminRoute')?.classList.add('hidden'); }
 
-function confirmAdminDispatch(e) {
+async function confirmAdminDispatch(e) {
   e.preventDefault();
   const id = document.getElementById('adminVerifyId').value;
   const dept = document.getElementById('adminRouteDept').value;
 
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
-
-  const wasRework = Boolean(c.feedback === 'Not Satisfied' || c.status === 'Student Not Satisfied');
-
-  c.category = dept;
-  c.status = 'Assigned to Faculty';
-  c.current_status = 'Assigned to Faculty';
-  c.stage = 2;
-  c.admin_status = 'Approved';
-  c.admin_verification_date = nowStr();
-  c.faculty_status = 'Pending';
-  c.technician_status = 'Pending';
-  c.work_status = 'Not Started';
-  c.feedback = null;
-  c.feedbackStatus = null;
-
-  c.logs.push({ 
-    s: 'Admin Verified', 
-    note: wasRework
-      ? `Sent back by Admin to ${dept} Faculty Advisor for rework & technician reassignment`
-      : `Approved by Admin & assigned to ${dept} Faculty Advisor`, 
-    time: nowStr(), 
-    by: 'Admin Office' 
-  });
-
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: c.reportedByGr,
-    forDept: dept,
-    forTech: null,
-    text: wasRework
-      ? `Admin sent complaint ${c.id} back to ${dept} Faculty for rework.`
-      : `Admin verified complaint ${c.id} and assigned to ${dept} Faculty.`,
-    time: nowStr(),
-    read: false
-  });
-
-  persist();
-  closeAdminRouteModal();
-  toast(wasRework ? `Complaint ${c.id} sent back to ${dept} Faculty for rework.` : `Complaint ${c.id} verified & assigned to ${dept} Faculty.`);
-  renderAdmin();
+  try {
+    const res = await fetch('backend/complaints/admin_verify.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'approve', dept })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error routing complaint', 'err');
+    
+    closeAdminRouteModal();
+    toast(data.message || 'Complaint verified & assigned to Faculty.');
+    renderAdmin();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
-function adminRejectTicket() {
+async function adminRejectTicket() {
   const id = document.getElementById('adminVerifyId').value;
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
-
-  c.status = 'Rejected by Admin';
-  c.current_status = 'Rejected by Admin';
-  c.stage = 0;
-  c.admin_status = 'Rejected';
-  c.faculty_status = 'Rejected';
-  c.technician_status = 'Cancelled';
-  c.work_status = 'Cancelled';
-  c.rejectionReason = 'Rejected by Admin during initial verification';
-  c.logs.push({ s: 'Rejected by Admin', note: 'Fraud / non-compliant complaint rejected by Admin.', time: nowStr(), by: 'Admin Office' });
-
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: c.reportedByGr,
-    forDept: null,
-    forTech: null,
-    text: `Your complaint ${c.id} was rejected by Admin verification.`,
-    time: nowStr(),
-    read: false
-  });
-
-  persist();
-  closeAdminRouteModal();
-  toast('Complaint rejected & archived.', 'err');
-  renderAdmin();
+  try {
+    const res = await fetch('backend/complaints/admin_verify.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'reject' })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error rejecting complaint', 'err');
+    
+    closeAdminRouteModal();
+    toast('Complaint rejected & archived.', 'err');
+    renderAdmin();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
 function renderAdminFinalTickets() {
@@ -787,48 +793,42 @@ function renderAdminFinalTickets() {
   if (typeof initScrollObserver === 'function') setTimeout(initScrollObserver, 50);
 }
 
-function confirmAdminFinalApproval(id) {
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
-
-  c.status = 'Completed';
-  c.current_status = 'Completed';
-  c.stage = 7;
-  c.admin_final_date = nowStr();
-  c.logs.push({ s: 'Admin Final Verified', note: 'Admin verified faculty audit and approved completion.', time: nowStr(), by: 'Admin Office' });
-  c.logs.push({ s: 'Completed', note: 'Complaint fully completed and officially closed.', time: nowStr(), by: 'System' });
-  
-  if (c.techId) {
-    const t = appState.technicians.find(x => x.id === c.techId);
-    if (t) t.rating = Math.min(5.0, Number((t.rating + 0.1).toFixed(1)));
+async function confirmAdminFinalApproval(id) {
+  try {
+    const res = await fetch('backend/complaints/admin_final.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error completing complaint', 'err');
+    
+    toast(data.message || `Complaint ${id} verified and marked Completed ✅!`);
+    renderAdmin();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
   }
-
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: c.reportedByGr,
-    forDept: null,
-    forTech: c.techId,
-    text: `Your complaint ${c.id} has been verified by Admin and is now Completed ✅.`,
-    time: nowStr(),
-    read: false
-  });
-
-  persist();
-  toast(`Complaint ${c.id} verified and marked Completed ✅!`);
-  renderAdmin();
 }
 
 
 /* ==========================================================================
    3. TECHNICIAN VIEW (RECEIVES AFTER FACULTY ASSIGNMENT)
    ========================================================================== */
-function renderTechnician() {
+async function renderTechnician() {
   showView('technician');
   if (typeof syncNavProfile === 'function') syncNavProfile();
 
+  try {
+    const res = await fetch('backend/complaints/list.php?role=technician');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      appState.complaints = data.data;
+    }
+  } catch (e) {}
+
   const currentTechId = currentSession ? (currentSession.techId || currentSession.id) : null;
   const allList = appState.complaints.filter(c => 
-    (c.techId === currentTechId || (!c.techId && c.category === currentSession?.dept)) && 
+    (c.techId === currentTechId || (!c.techId && c.category === currentSession?.dept) || !currentSession) && 
     c.stage >= 3 &&
     c.status !== 'Rejected by Admin' &&
     c.status !== 'Rejected by Faculty'
@@ -936,32 +936,21 @@ function renderTechnician() {
   if (typeof initScrollObserver === 'function') setTimeout(initScrollObserver, 50);
 }
 
-function acceptTechComplaint(id) {
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
+async function acceptTechComplaint(id) {
+  try {
+    const res = await fetch('backend/technician/accept.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error accepting work order', 'err');
 
-  c.status = 'Work in Progress';
-  c.current_status = 'Work in Progress';
-  c.stage = 4;
-  c.technician_status = 'Accepted';
-  c.technician_action = 'Accepted';
-  c.work_status = 'In Progress';
-  c.logs.push({ s: 'Technician Accepted', note: 'Technician accepted complaint work order', time: nowStr(), by: currentSession.name });
-  c.logs.push({ s: 'Work in Progress', note: 'Resolution work actively underway', time: nowStr(), by: currentSession.name });
-
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: c.reportedByGr,
-    forDept: null,
-    forTech: null,
-    text: `Technician ${currentSession.name} accepted your complaint ${c.id} and started work.`,
-    time: nowStr(),
-    read: false
-  });
-
-  persist();
-  toast('Complaint accepted! Work is now in progress.');
-  renderTechnician();
+    toast('Complaint accepted! Work is now in progress.');
+    renderTechnician();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
 function openDeclineTechModal(id) {
@@ -972,59 +961,26 @@ function openDeclineTechModal(id) {
 
 function closeDeclineTechModal() { document.getElementById('modalDeclineTech')?.classList.add('hidden'); }
 
-function confirmDeclineTech(e) {
+async function confirmDeclineTech(e) {
   e.preventDefault();
   const id = document.getElementById('declineTechId').value;
   const reason = document.getElementById('declineTechReason').value.trim();
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
 
-  const techName = currentSession ? currentSession.name : 'Technician';
+  try {
+    const res = await fetch('backend/technician/decline.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, reason })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error declining work order', 'err');
 
-  c.status = 'Assigned to Faculty';
-  c.current_status = 'Assigned to Faculty';
-  c.stage = 2;
-  c.technician_status = 'Rejected';
-  c.technician_action = 'Rejected';
-  c.work_status = 'Not Started';
-  c.faculty_status = 'Pending Reassignment';
-  c.lastRejectedTech = techName;
-  c.rejectionReason = reason;
-  c.techId = null;
-  c.techName = null;
-  c.deadline = '';
-
-  c.logs.push({ 
-    s: 'Technician Declined', 
-    note: `Declined by ${techName}: "${reason}" — Returned to Faculty for technician reassignment`, 
-    time: nowStr(), 
-    by: techName 
-  });
-
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: null,
-    forDept: c.category,
-    forTech: null,
-    text: `Technician ${techName} declined complaint ${c.id}: "${reason}". Please reassign another technician.`,
-    time: nowStr(),
-    read: false
-  });
-
-  appState.notifs.unshift({
-    id: 'N' + (Date.now() + 1),
-    forGr: c.reportedByGr,
-    forDept: null,
-    forTech: null,
-    text: `Technician ${techName} was unavailable (${reason}). Department Faculty is reassigning a new technician.`,
-    time: nowStr(),
-    read: false
-  });
-
-  persist();
-  closeDeclineTechModal();
-  toast('Work order declined. Reason submitted to Faculty for technician reassignment.');
-  renderTechnician();
+    closeDeclineTechModal();
+    toast('Work order declined. Reason submitted to Faculty for technician reassignment.');
+    renderTechnician();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
 function openCompleteTechModal(id) {
@@ -1038,57 +994,52 @@ function openCompleteTechModal(id) {
 
 function closeCompleteTechModal() { document.getElementById('modalCompleteTech')?.classList.add('hidden'); }
 
-function confirmCompleteTech(e) {
+async function confirmCompleteTech(e) {
   e.preventDefault();
   const id = document.getElementById('completeTechId').value;
   const remark = document.getElementById('completeRemark').value.trim();
   if (!tmpBase64Proof) return toast('Please upload photograph proof of completed work', 'err');
 
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
+  try {
+    const res = await fetch('backend/technician/complete.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, remark, proof_img: tmpBase64Proof })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error completing work order', 'err');
 
-  c.status = 'Work Completed by Technician';
-  c.current_status = 'Work Completed by Technician';
-  c.stage = 5;
-  c.technician_status = 'Completed';
-  c.work_status = 'Completed';
-  c.technician_completion_date = nowStr();
-  c.proofImg = tmpBase64Proof;
-  c.remark = remark;
-  c.logs.push({ s: 'Technician Completed', note: remark, time: nowStr(), by: currentSession.name });
-  c.logs.push({ s: 'Sent to Faculty', note: 'Transferred to Department Faculty for QA Verification', time: nowStr(), by: currentSession.name });
-
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: c.reportedByGr,
-    forDept: c.category,
-    forTech: null,
-    text: `Technician finished work on ${c.id}. Ready for Faculty Verification.`,
-    time: nowStr(),
-    read: false
-  });
-
-  persist();
-  closeCompleteTechModal();
-  toast('Work completed! Transferred to Faculty Dashboard for verification.');
-  renderTechnician();
+    closeCompleteTechModal();
+    toast('Work completed! Transferred to Faculty Dashboard for verification.');
+    renderTechnician();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
 
 /* ==========================================================================
    4. FACULTY VIEW (ASSIGNS TECH & VERIFIES COMPLETED WORK)
    ========================================================================== */
-function renderFaculty() {
+async function renderFaculty() {
   showView('faculty');
   if (typeof syncNavProfile === 'function') syncNavProfile();
   
+  try {
+    const res = await fetch('backend/complaints/list.php?role=faculty');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      appState.complaints = data.data;
+    }
+  } catch (e) {}
+
   const header = document.getElementById('facDeptHeader');
-  if (header) header.innerText = (currentSession.dept || 'Department') + ' Operations & QA Panel';
+  if (header) header.innerText = ((currentSession && currentSession.dept) ? currentSession.dept : 'Department') + ' Operations & QA Panel';
   const query = (document.getElementById('facSearch')?.value || '').trim().toLowerCase();
 
   // Faculty receives complaints assigned by Admin to their department, plus tech-completed work
   const allList = appState.complaints.filter(c => 
-    (c.category === currentSession.dept || !currentSession.dept) && 
+    (!currentSession || !currentSession.dept || c.category === currentSession.dept) && 
     c.stage >= 2 &&
     c.status !== 'Rejected by Admin'
   );
@@ -1222,7 +1173,7 @@ function renderFaculty() {
   if (typeof initScrollObserver === 'function') setTimeout(initScrollObserver, 50);
 }
 
-function openFacultyForwardModal(id) {
+async function openFacultyForwardModal(id) {
   const c = appState.complaints.find(x => x.id === id);
   if (!c) return;
 
@@ -1236,9 +1187,19 @@ function openFacultyForwardModal(id) {
   const select = document.getElementById('forwardSelectedTech');
   if (select) {
     select.innerHTML = '';
-    let techs = appState.technicians.filter(t => t.active && t.dept === c.category);
-    if (techs.length === 0) techs = appState.technicians.filter(t => t.active);
-    techs.forEach(t => {
+    let techs = [];
+    try {
+      const res = await fetch('backend/admin/staff.php');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        techs = data.data;
+        appState.technicians = techs;
+      }
+    } catch (e) {}
+    if (!techs.length) techs = appState.technicians || [];
+    let filteredTechs = techs.filter(t => t.active && t.dept === c.category);
+    if (filteredTechs.length === 0) filteredTechs = techs.filter(t => t.active);
+    filteredTechs.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id;
       const isPrevDeclined = c.lastRejectedTech && t.name.includes(c.lastRejectedTech);
@@ -1256,56 +1217,28 @@ function openFacultyForwardModal(id) {
 
 function closeFacultyForwardModal() { document.getElementById('modalFacultyForward')?.classList.add('hidden'); }
 
-function confirmFacultyForward(e) {
+async function confirmFacultyForward(e) {
   e.preventDefault();
   const id = document.getElementById('forwardVerifyId').value;
   const select = document.getElementById('forwardSelectedTech');
   const techId = select ? select.value : null;
-  const techObj = appState.technicians.find(x => x.id === techId) || appState.technicians[0];
-  const techName = techObj ? techObj.name : 'Assigned Technician';
   const deadline = document.getElementById('forwardDeadline')?.value || '';
 
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
+  try {
+    const res = await fetch('backend/faculty/assign_technician.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, techId, deadline })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error dispatching technician', 'err');
 
-  const wasReassigned = Boolean(c.lastRejectedTech || c.technician_status === 'Rejected');
-
-  c.techId = techObj ? techObj.id : techId;
-  c.techName = techName;
-  c.deadline = deadline;
-  c.status = 'Assigned to Technician';
-  c.current_status = 'Assigned to Technician';
-  c.stage = 3;
-  c.faculty_status = 'Dispatched';
-  c.technician_status = 'Pending';
-  c.work_status = 'Not Started';
-  c.lastRejectedTech = null;
-
-  c.logs.push({ 
-    s: 'Faculty Assigned Tech', 
-    note: wasReassigned
-      ? `Reassigned to Technician ${techName} with deadline ${deadline || 'N/A'}`
-      : `Faculty assigned work to Technician ${techName} with deadline ${deadline || 'N/A'}`, 
-    time: nowStr(), 
-    by: currentSession.name 
-  });
-
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: c.reportedByGr,
-    forDept: null,
-    forTech: c.techId,
-    text: wasReassigned 
-      ? `Faculty reassigned complaint ${c.id} to Technician ${techName}.`
-      : `Faculty assigned complaint ${c.id} to Technician ${techName}.`,
-    time: nowStr(),
-    read: false
-  });
-
-  persist();
-  closeFacultyForwardModal();
-  toast(`Work order dispatched to Technician ${techName}.`);
-  renderFaculty();
+    closeFacultyForwardModal();
+    toast(data.message || 'Work order dispatched to Technician.');
+    renderFaculty();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
 function openFacultyQaModal(id) {
@@ -1329,59 +1262,47 @@ function setFacultyQaApproval(approve) {
   }
 }
 
-function confirmFacultyQa(e) {
+async function confirmFacultyQa(e) {
   e.preventDefault();
   const id = document.getElementById('qaVerifyId').value;
   const comment = document.getElementById('qaFeedbackComment').value.trim();
-  const c = appState.complaints.find(x => x.id === id);
-  if (!c) return;
 
-  if (qaApprovalState) {
-    c.status = 'Faculty Verified';
-    c.current_status = 'Faculty Verified';
-    c.stage = 6;
-    c.faculty_status = 'Verified';
-    c.faculty_verification_date = nowStr();
-    c.qaVerified = true;
-    c.qaFeedback = comment || 'Verified and approved by Faculty Advisor';
-    c.logs.push({ s: 'Faculty Verified', note: c.qaFeedback + ' - Sent to Admin for final approval', time: nowStr(), by: currentSession.name });
-
-    appState.notifs.unshift({
-      id: 'N' + Date.now(),
-      forGr: null,
-      forDept: null,
-      forTech: null,
-      text: `Faculty verified ${c.id}. Awaiting Admin final verification and completion.`,
-      time: nowStr(),
-      read: false
+  try {
+    const res = await fetch('backend/faculty/qa_verify.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, approve: qaApprovalState, comment })
     });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error recording inspection', 'err');
 
-    toast('Inspection completed! Sent to Admin for final verification.');
-  } else {
-    c.status = 'Work in Progress';
-    c.current_status = 'Work in Progress';
-    c.stage = 4;
-    c.faculty_status = 'Redo Requested';
-    c.logs.push({ s: 'Faculty Redo Requested', note: comment, time: nowStr(), by: currentSession.name });
-    toast('Redo requested. Returned to technician queue.', 'err');
+    closeFacultyQaModal();
+    toast(data.message || 'Inspection updated.');
+    renderFaculty();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
   }
-
-  persist();
-  closeFacultyQaModal();
-  renderFaculty();
 }
 
 
 /* ==========================================================================
    5. STAFF & STUDENT CONFIGURATION
    ========================================================================== */
-function renderAdminStaff() {
+async function renderAdminStaff() {
   const list = document.getElementById('adminStaffList');
   if (!list) return;
   list.innerHTML = '';
 
-  appState.technicians.forEach((t, index) => {
-    const activeTasksCount = appState.complaints.filter(c => c.techId === t.id && (c.stage >= 2 && c.stage <= 5)).length;
+  try {
+    const res = await fetch('backend/admin/staff.php');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      appState.technicians = data.data;
+    }
+  } catch (e) {}
+
+  (appState.technicians || []).forEach((t, index) => {
+    const activeTasksCount = t.activeDuties !== undefined ? t.activeDuties : (appState.complaints || []).filter(c => c.techId === t.id && (c.stage >= 2 && c.stage <= 5)).length;
     
     const card = document.createElement('div');
     const delayClass = `delay-${((index % 4) + 1) * 100}`;
@@ -1423,17 +1344,17 @@ function openStaffModal() {
 function closeStaffModal() { document.getElementById('modalStaff')?.classList.add('hidden'); }
 
 function editStaff(id) {
-  const t = appState.technicians.find(x => x.id === id);
+  const t = (appState.technicians || []).find(x => x.id === id);
   if (!t) return;
   document.getElementById('staffEditId').value = t.id;
   document.getElementById('staffName').value = t.name;
   document.getElementById('staffDept').value = t.dept;
   document.getElementById('staffExp').value = t.experience;
-  document.getElementById('staffPassNew').value = t.password;
+  document.getElementById('staffPassNew').value = 'password';
   document.getElementById('modalStaff').classList.remove('hidden');
 }
 
-function saveStaff(e) {
+async function saveStaff(e) {
   e.preventDefault();
   const editId = document.getElementById('staffEditId').value;
   const name = document.getElementById('staffName').value.trim();
@@ -1441,39 +1362,58 @@ function saveStaff(e) {
   const exp = parseInt(document.getElementById('staffExp').value, 10);
   const pass = document.getElementById('staffPassNew').value;
 
-  if (editId) {
-    const t = appState.technicians.find(x => x.id === editId);
-    t.name = name; t.dept = dept; t.experience = exp; t.password = pass;
-    toast(`Technician details updated.`);
-  } else {
-    const newId = 'TECH-' + String(appState.technicians.length + 1).padStart(2, '0');
-    appState.technicians.push({ id: newId, name, dept, experience: exp, rating: 5.0, active: true, password: pass });
-    toast(`Registered technician: ${name} assigned to ${dept}`);
+  try {
+    const res = await fetch('backend/admin/staff.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save', editId, name, dept, experience: exp, password: pass })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error saving staff member', 'err');
+
+    closeStaffModal();
+    toast(data.message || 'Technician registry updated.');
+    renderAdminStaff();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
   }
-  persist();
-  closeStaffModal();
-  renderAdminStaff();
 }
 
-function toggleStaff(id) {
-  const t = appState.technicians.find(x => x.id === id);
-  if (!t) return;
-  t.active = !t.active;
-  persist();
-  toast(t.active ? 'Technician account activated.' : 'Technician account deactivated.');
-  renderAdminStaff();
+async function toggleStaff(id) {
+  try {
+    const res = await fetch('backend/admin/staff.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle', id })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error updating staff status', 'err');
+
+    toast(data.message);
+    renderAdminStaff();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
-function renderAdminStudents() {
+async function renderAdminStudents() {
   const query = document.getElementById('studentSearch')?.value.toLowerCase() || '';
   const container = document.getElementById('adminStudentList');
   if (!container) return;
   container.innerHTML = '';
 
-  appState.users.forEach((u, index) => {
+  try {
+    const res = await fetch('backend/admin/students.php');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      appState.users = data.data;
+    }
+  } catch (e) {}
+
+  (appState.users || []).forEach((u, index) => {
     if (query && !u.name.toLowerCase().includes(query) && !u.grNo.includes(query)) return;
 
-    const complaintsCount = appState.complaints.filter(c => c.reportedByGr === u.grNo).length;
+    const complaintsCount = u.complaintsCount !== undefined ? u.complaintsCount : (appState.complaints || []).filter(c => c.reportedByGr === u.grNo).length;
     const card = document.createElement('div');
     const delayClass = `delay-${((index % 4) + 1) * 100}`;
     card.className = `border rounded-2xl p-4 bg-white dark:bg-zinc-900 space-y-3 reveal-on-scroll ${delayClass}`;
@@ -1502,19 +1442,19 @@ function renderAdminStudents() {
 }
 
 function adminOverrideStudentProfile(grNo) {
-  const u = appState.users.find(x => x.grNo === grNo);
+  const u = (appState.users || []).find(x => x.grNo === grNo);
   if (!u) return;
   document.getElementById('adminUserEditGr').value = u.grNo;
   document.getElementById('adminUserEditName').value = u.name;
   document.getElementById('adminUserEditDept').value = u.dept;
-  document.getElementById('adminUserEditPass').value = u.password;
+  document.getElementById('adminUserEditPass').value = 'password';
   document.getElementById('adminUserEditImgUrl').value = u.avatar || '';
   document.getElementById('modalAdminUserEdit')?.classList.remove('hidden');
 }
 
 function closeAdminUserEdit() { document.getElementById('modalAdminUserEdit')?.classList.add('hidden'); }
 
-function saveAdminUserEdit(e) {
+async function saveAdminUserEdit(e) {
   e.preventDefault();
   const gr = document.getElementById('adminUserEditGr').value;
   const name = document.getElementById('adminUserEditName').value.trim();
@@ -1522,29 +1462,55 @@ function saveAdminUserEdit(e) {
   const pass = document.getElementById('adminUserEditPass').value;
   const img = document.getElementById('adminUserEditImgUrl').value.trim();
 
-  const u = appState.users.find(x => x.grNo === gr);
-  if (u) {
-    u.name = name; u.dept = dept; u.password = pass; u.avatar = img || null; persist();
-    toast(`Administrative profile override applied for student: ${name}`);
+  try {
+    const res = await fetch('backend/admin/students.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'override', gr, name, dept, password: pass, avatar: img })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error overriding profile', 'err');
+
+    closeAdminUserEdit();
+    toast(data.message || `Administrative profile override applied for student: ${name}`);
+    renderAdminStudents();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
   }
-  closeAdminUserEdit();
-  renderAdminStudents();
 }
 
-function toggleStudentWarnStatus(gr) {
-  const u = appState.users.find(x => x.grNo === gr);
-  if (!u) return;
-  u.warned = !u.warned; persist();
-  toast(`Student warning status updated.`);
-  renderAdminStudents();
+async function toggleStudentWarnStatus(gr) {
+  try {
+    const res = await fetch('backend/admin/students.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_warn', gr })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error updating warning status', 'err');
+
+    toast(data.message);
+    renderAdminStudents();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
-function toggleStudentSuspendStatus(gr) {
-  const u = appState.users.find(x => x.grNo === gr);
-  if (!u) return;
-  u.suspended = !u.suspended; persist();
-  toast(`Student suspension status updated.`);
-  renderAdminStudents();
+async function toggleStudentSuspendStatus(gr) {
+  try {
+    const res = await fetch('backend/admin/students.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_suspend', gr })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Error updating suspension status', 'err');
+
+    toast(data.message);
+    renderAdminStudents();
+  } catch (err) {
+    toast('Error communicating with server', 'err');
+  }
 }
 
 
@@ -1556,7 +1522,7 @@ function renderReports() {
   if (techFilter) {
     const curVal = techFilter.value;
     techFilter.innerHTML = '<option value="All">All Technicians</option>';
-    appState.technicians.forEach(t => {
+    (appState.technicians || []).forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.name;
       opt.textContent = `${t.name} (${t.dept})`;
@@ -1649,18 +1615,7 @@ function renderReports() {
 }
 
 function exportCSV() {
-  let csv = 'Complaint ID,Student Name,Enrollment GR,Department,Complaint Title,Technician,Date Reported,Date Solved,Days Pending,Current Status,Feedback\n';
-  appState.complaints.forEach(c => {
-    const days = typeof getDaysPending === 'function' ? getDaysPending(c.reportedAt) : 0;
-    const solvedDate = (c.stage === 7 || c.status === 'Completed') ? (c.admin_final_date || c.technician_completion_date || c.reportedAt) : 'N/A';
-    csv += `"${c.id}","${c.reportedBy}","${c.reportedByGr}","${c.category}","${(c.title || '').replace(/"/g, '""')}","${c.techName || ''}","${c.reportedAt}","${solvedDate}","${days}","${c.status}","${c.feedback || ''}"\n`;
-  });
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'Campus_Connect_Operational_Report.csv';
-  anchor.click();
+  window.location.href = 'backend/admin/export_csv.php';
 }
 
 function printReport() { window.print(); }
