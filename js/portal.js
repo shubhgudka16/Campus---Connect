@@ -118,7 +118,7 @@ function closeComplaintModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-function submitComplaint(e) {
+async function submitComplaint(e) {
   e.preventDefault();
   const title = document.getElementById('cTitle')?.value.trim() || '';
   const category = document.getElementById('cCategory')?.value || 'Computer Department';
@@ -131,95 +131,77 @@ function submitComplaint(e) {
     return;
   }
 
-  const ticketId = 'COMP-' + Math.floor(100 + Math.random() * 9000);
-  const reporterName = (typeof currentSession !== 'undefined' && currentSession && currentSession.name) ? currentSession.name : 'Kabir Mehta';
-  const reporterGr = (typeof currentSession !== 'undefined' && currentSession && currentSession.grNo) ? currentSession.grNo : '1001';
+  try {
+    const payload = {
+      title,
+      category,
+      priority,
+      location,
+      description: desc,
+      image: tmpBase64Image || '',
+      video: tmpBase64Video || ''
+    };
 
-  const issueObj = {
-    id: ticketId,
-    title,
-    category,
-    description: desc,
-    location,
-    priority,
-    reportedBy: reporterName,
-    reportedByGr: reporterGr,
-    reportedAt: nowStr(),
-    status: 'Complaint Submitted',
-    current_status: 'Complaint Submitted',
-    stage: 1,
-    admin_status: 'Pending',
-    technician_status: 'Pending',
-    technician_action: null,
-    work_status: 'Not Started',
-    faculty_status: 'Pending',
-    technician_completion_date: null,
-    faculty_verification_date: null,
-    techId: null,
-    techName: null,
-    rejectionReason: '',
-    deadline: '',
-    image: tmpBase64Image || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=600',
-    video: tmpBase64Video || '',
-    proofImg: '',
-    remark: '',
-    qaVerified: false,
-    qaFeedback: '',
-    logs: [
-      { s: 'Complaint Submitted', note: `Self Category: ${category} | Priority: ${priority}`, time: nowStr(), by: reporterName }
-    ]
-  };
+    const res = await fetch('backend/complaints/create.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-  if (!appState.complaints) appState.complaints = [];
-  if (!appState.notifs) appState.notifs = [];
+    if (!res.ok) {
+      let errData = null;
+      try { errData = await res.json(); } catch (e) {}
+      return toast(errData?.message || 'Unable to save complaint. Please try again.', 'err');
+    }
 
-  appState.complaints.unshift(issueObj);
-  appState.notifs.unshift({
-    id: 'N' + Date.now(),
-    forGr: null,
-    forDept: null,
-    forTech: null,
-    text: `Incoming verification required: ${ticketId} [${priority}] from ${reporterName}`,
-    time: nowStr(),
-    read: false
-  });
+    const data = await res.json();
 
-  persist();
-  closeComplaintModal();
+    if (!data.success) {
+      return toast(data.message || 'Unable to save complaint. Please try again.', 'err');
+    }
 
-  // Reset form inputs
-  const titleInput = document.getElementById('cTitle');
-  if (titleInput) titleInput.value = '';
-  const locInput = document.getElementById('cLocation');
-  if (locInput) locInput.value = '';
-  const descInput = document.getElementById('cDesc');
-  if (descInput) descInput.value = '';
+    const created = data.data?.complaint || data.data;
 
-  tmpBase64Image = null;
-  tmpBase64Video = null;
-  const imgPreview = document.getElementById('imgUploadPreview');
-  if (imgPreview) imgPreview.classList.add('hidden');
-  const imgBtn = document.getElementById('imgPlaceholderBtn');
-  if (imgBtn) imgBtn.classList.remove('hidden');
-  const vidPreview = document.getElementById('videoUploadPreview');
-  if (vidPreview) vidPreview.classList.add('hidden');
-  const vidBtn = document.getElementById('videoPlaceholderBtn');
-  if (vidBtn) vidBtn.classList.remove('hidden');
-  const priorityAlert = document.getElementById('priorityDetectAlert');
-  if (priorityAlert) priorityAlert.classList.add('hidden');
+    closeComplaintModal();
 
-  toast(`Complaint ${ticketId} registered & routed to Admin queue.`);
+    // Reset form inputs
+    const titleInput = document.getElementById('cTitle');
+    if (titleInput) titleInput.value = '';
+    const locInput = document.getElementById('cLocation');
+    if (locInput) locInput.value = '';
+    const descInput = document.getElementById('cDesc');
+    if (descInput) descInput.value = '';
 
-  if (typeof renderStudent === 'function' && typeof currentSession !== 'undefined' && currentSession && currentSession.role === 'student') {
-    renderStudent();
-  } else if (typeof renderByRole === 'function') {
-    renderByRole();
-  }
-  if (typeof renderLandingStats === 'function') {
-    renderLandingStats();
-  }
-  if (typeof renderPublicFeed === 'function') {
-    renderPublicFeed();
+    tmpBase64Image = null;
+    tmpBase64Video = null;
+    const imgPreview = document.getElementById('imgUploadPreview');
+    if (imgPreview) imgPreview.classList.add('hidden');
+    const imgBtn = document.getElementById('imgPlaceholderBtn');
+    if (imgBtn) imgBtn.classList.remove('hidden');
+    const vidPreview = document.getElementById('videoUploadPreview');
+    if (vidPreview) vidPreview.classList.add('hidden');
+    const vidBtn = document.getElementById('videoPlaceholderBtn');
+    if (vidBtn) vidBtn.classList.remove('hidden');
+    const priorityAlert = document.getElementById('priorityDetectAlert');
+    if (priorityAlert) priorityAlert.classList.add('hidden');
+
+    toast(`Complaint ${created?.id || ''} registered & routed to Admin queue.`);
+
+    // Reload complaint list directly from MySQL database — do not rely on local array
+    if (typeof renderStudent === 'function' && typeof currentSession !== 'undefined' && currentSession && currentSession.role === 'student') {
+      await renderStudent(true);
+    } else if (typeof renderByRole === 'function') {
+      await renderByRole();
+    }
+    if (typeof renderLandingStats === 'function') {
+      renderLandingStats();
+    }
+    if (typeof renderPublicFeed === 'function') {
+      renderPublicFeed();
+    }
+  } catch (err) {
+    console.error('Error submitting complaint:', err);
+    toast('Unable to save complaint. Please try again.', 'err');
   }
 }
 

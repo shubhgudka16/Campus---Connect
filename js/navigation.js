@@ -220,7 +220,43 @@ function triggerEmergencyReport() {
 
 function toggleMobileMenu() {
   const menu = document.getElementById('mobileMenuDrawer');
-  if (menu) menu.classList.toggle('hidden');
+  if (!menu) return;
+
+  const isReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof gsap === 'undefined' || isReduced) {
+    menu.classList.toggle('hidden');
+    return;
+  }
+
+  const isCurrentlyHidden = menu.classList.contains('hidden');
+  if (isCurrentlyHidden) {
+    menu.classList.remove('hidden');
+    gsap.killTweensOf(menu);
+    gsap.fromTo(menu, 
+      { opacity: 0, y: -10, transformOrigin: 'top center' }, 
+      { opacity: 1, y: 0, duration: 0.32, ease: 'power3.out' }
+    );
+    const items = menu.querySelectorAll('.mobile-nav-btn');
+    if (items.length) {
+      gsap.fromTo(items,
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.28, stagger: 0.04, ease: 'power2.out', delay: 0.05 }
+      );
+    }
+  } else {
+    gsap.killTweensOf(menu);
+    gsap.to(menu, {
+      opacity: 0,
+      y: -8,
+      duration: 0.2,
+      ease: 'power2.in',
+      onComplete: () => {
+        menu.classList.add('hidden');
+        menu.style.removeProperty('opacity');
+        menu.style.removeProperty('transform');
+      }
+    });
+  }
 }
 
 /* ---------- INSTANT ZERO-FLASH PAGE TRANSITIONS ---------- */
