@@ -6,6 +6,7 @@
 
 require_once dirname(__DIR__) . '/config/database.php';
 
+<<<<<<< HEAD
 $currentUser = getAuthUser();
 $data = getRequestData();
 $db = getDbConnection();
@@ -17,6 +18,14 @@ if (!$currentUser && empty($data['gr']) && empty($data['grNo']) && empty($data['
 
 if ($role === 'student') {
     $gr = $currentUser['grNo'] ?? $currentUser['identifier'] ?? trim($data['gr'] ?? $data['grNo'] ?? '');
+=======
+$currentUser = requireAuth();
+$db = getDbConnection();
+$role = $currentUser['role'];
+
+if ($role === 'student') {
+    $gr = $currentUser['grNo'] ?? $currentUser['identifier'];
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     $stmt = $db->prepare("UPDATE notifications SET is_read = 1 WHERE for_gr = ? OR (for_gr IS NULL AND for_dept IS NULL AND for_tech IS NULL AND for_role IS NULL)");
     $stmt->execute([$gr]);
 } elseif ($role === 'faculty') {

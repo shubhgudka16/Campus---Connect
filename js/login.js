@@ -32,6 +32,7 @@ function switchRole(r) {
   });
 }
 
+<<<<<<< HEAD
 /**
  * Unified robust login executor handling all network, server, database, and credential states
  */
@@ -134,24 +135,105 @@ async function loginStudent(e) {
   await executeLoginRequest({ role: 'student', stuGr: gr, stuPass: pass }, 'Invalid G.R. Number or Password');
 }
 
+=======
+async function loginStudent(e) {
+  e.preventDefault();
+  const gr = document.getElementById('stuGr').value.trim();
+  const pass = document.getElementById('stuPass').value;
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'student', stuGr: gr, stuPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Invalid G.R. Number or Password', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast(`Welcome ${currentSession.name}`);
+    runSessionTimer();
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const actionQuery = action ? `&action=${encodeURIComponent(action)}` : '';
+    setTimeout(() => {
+      window.location.href = `roles.html?role=student${actionQuery}`;
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
+}
+
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 async function loginFaculty(e) {
   e.preventDefault();
   const dept = document.getElementById('facDeptInput').value;
   const pass = document.getElementById('facPass').value;
+<<<<<<< HEAD
   await executeLoginRequest({ role: 'faculty', facDept: dept, facPass: pass }, 'Invalid Faculty Credentials');
+=======
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'faculty', facDept: dept, facPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Invalid Faculty Credentials', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast(`Faculty authorized: ${dept}`);
+    runSessionTimer();
+    setTimeout(() => {
+      window.location.href = 'roles.html?role=faculty';
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 }
 
 async function loginTechnician(e) {
   e.preventDefault();
   const id = document.getElementById('techId').value.trim().toUpperCase();
   const pass = document.getElementById('techPass').value;
+<<<<<<< HEAD
   await executeLoginRequest({ role: 'technician', techId: id, techPass: pass }, 'Invalid Technician credentials');
+=======
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'technician', techId: id, techPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Invalid Technician credentials', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast(`Technician session open: ${currentSession.name}`);
+    runSessionTimer();
+    setTimeout(() => {
+      window.location.href = 'roles.html?role=technician';
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 }
 
 async function loginAdmin(e) {
   e.preventDefault();
   const user = document.getElementById('adminUser').value.trim();
   const pass = document.getElementById('adminPass').value;
+<<<<<<< HEAD
   await executeLoginRequest({ role: 'admin', adminUser: user, adminPass: pass }, 'Admin Credentials Invalid');
 }
 
@@ -162,6 +244,35 @@ async function logout(isAutoExpired = false) {
       await fetch(apiUrl, { method: 'POST' });
     } catch (e) {}
   }
+=======
+  try {
+    const res = await fetch('backend/auth/login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'admin', adminUser: user, adminPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Admin Credentials Invalid', 'err');
+    }
+    currentSession = data.data.session;
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    sessionStorage.setItem('campus_session_active', '1');
+    toast('Admin terminal unlocked');
+    runSessionTimer();
+    setTimeout(() => {
+      window.location.href = 'roles.html?role=admin';
+    }, 400);
+  } catch (err) {
+    toast('Login failed. Please verify server connection.', 'err');
+  }
+}
+
+async function logout(isAutoExpired = false) {
+  try {
+    await fetch('backend/auth/logout.php', { method: 'POST' });
+  } catch (e) {}
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 
   currentSession = null;
   localStorage.removeItem('campus_session');
@@ -201,11 +312,14 @@ function openRegister() {
   if (modal) modal.classList.remove('hidden');
 }
 
+<<<<<<< HEAD
 function closeRegister() {
   const modal = document.getElementById('modalRegister');
   if (modal) modal.classList.add('hidden');
 }
 
+=======
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 async function handleRegister(e) {
   e.preventDefault();
   const name = document.getElementById('regName').value.trim();
@@ -213,6 +327,7 @@ async function handleRegister(e) {
   const dept = document.getElementById('regDept').value.trim();
   const pass = document.getElementById('regPass').value;
 
+<<<<<<< HEAD
   if (window.location.protocol === 'file:') {
     console.error('Registration API request failed\nStatus: File Protocol (file://)\nResponse: Local file opening cannot run PHP.');
     return toast('Unable to connect to the PHP server. Make sure Apache is running and open the website through http://localhost/...', 'err');
@@ -253,6 +368,24 @@ async function handleRegister(e) {
   } catch (netErr) {
     console.error('Registration API request failed\nStatus: Network Error\nResponse: ' + (netErr?.message || String(netErr)));
     toast('Unable to connect to the PHP server. Make sure Apache is running and open the website through http://localhost/...', 'err');
+=======
+  try {
+    const res = await fetch('backend/auth/register.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ regName: name, regGr: gr, regDept: dept, regPass: pass })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return toast(data.message || 'Registration failed', 'err');
+    }
+    closeRegister();
+    toast('Student account generated! Log in below.');
+    document.getElementById('stuGr').value = gr;
+    document.getElementById('stuPass').value = '';
+  } catch (err) {
+    toast('Registration failed. Please try again.', 'err');
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
   }
 }
 

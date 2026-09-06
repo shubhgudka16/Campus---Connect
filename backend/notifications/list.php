@@ -7,6 +7,7 @@
 require_once dirname(__DIR__) . '/config/database.php';
 
 $currentUser = getAuthUser();
+<<<<<<< HEAD
 $data = getRequestData();
 $db = getDbConnection();
 
@@ -21,6 +22,18 @@ if ($role === 'student') {
     if ($gr === '') {
         sendJson(true, 'Missing student identifier', []);
     }
+=======
+
+if (!$currentUser) {
+    sendJson(true, 'No notifications for unauthenticated user', []);
+}
+
+$db = getDbConnection();
+$role = $currentUser['role'];
+
+if ($role === 'student') {
+    $gr = $currentUser['grNo'] ?? $currentUser['identifier'];
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     $stmt = $db->prepare("
         SELECT * FROM notifications 
         WHERE for_gr = ? OR (for_gr IS NULL AND for_dept IS NULL AND for_tech IS NULL AND for_role IS NULL)
@@ -28,7 +41,11 @@ if ($role === 'student') {
     ");
     $stmt->execute([$gr]);
 } elseif ($role === 'faculty') {
+<<<<<<< HEAD
     $dept = $currentUser['dept'] ?? trim($data['dept'] ?? '');
+=======
+    $dept = $currentUser['dept'] ?? '';
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     $stmt = $db->prepare("
         SELECT * FROM notifications 
         WHERE for_dept = ? OR for_role = 'faculty' OR (for_gr IS NULL AND for_dept IS NULL AND for_tech IS NULL AND for_role IS NULL)
@@ -36,7 +53,11 @@ if ($role === 'student') {
     ");
     $stmt->execute([$dept]);
 } elseif ($role === 'technician') {
+<<<<<<< HEAD
     $techId = $currentUser['techId'] ?? $currentUser['identifier'] ?? trim($data['techId'] ?? $data['id'] ?? '');
+=======
+    $techId = $currentUser['techId'] ?? $currentUser['identifier'];
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     $stmt = $db->prepare("
         SELECT * FROM notifications 
         WHERE for_tech = ? OR for_role = 'technician' OR (for_gr IS NULL AND for_dept IS NULL AND for_tech IS NULL AND for_role IS NULL)

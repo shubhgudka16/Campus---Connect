@@ -726,6 +726,7 @@ async function saveProfile(e) {
 /* ---------- LIVE NOTIFICATIONS WORKSPACE ---------- */
 let notifPollingTimer = null;
 
+<<<<<<< HEAD
 function toggleNotif() {
   const drop = document.getElementById('notifDrop');
   if (!drop) return;
@@ -751,11 +752,14 @@ function startNotificationPolling() {
   }
 }
 
+=======
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 async function renderNotifs() {
   if (!currentSession) return;
   let notifications = [];
   
   try {
+<<<<<<< HEAD
     let queryParam = '';
     if (currentSession.role === 'student' && currentSession.grNo) {
       queryParam = `?role=student&gr=${encodeURIComponent(currentSession.grNo)}`;
@@ -769,6 +773,9 @@ async function renderNotifs() {
     }
 
     const res = await fetch(`backend/notifications/list.php${queryParam}`);
+=======
+    const res = await fetch('backend/notifications/list.php');
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     const data = await res.json();
     if (data.success && Array.isArray(data.data)) {
       notifications = data.data;
@@ -778,6 +785,7 @@ async function renderNotifs() {
     }
   } catch (e) {
     if (currentSession.role === 'student') {
+<<<<<<< HEAD
       notifications = (appState.notifs || []).filter(n => n.forGr === currentSession.grNo || n.forGr === null);
     } else if (currentSession.role === 'faculty') {
       notifications = (appState.notifs || []).filter(n => n.forDept === currentSession.dept || n.forDept === null);
@@ -785,6 +793,15 @@ async function renderNotifs() {
       notifications = (appState.notifs || []).filter(n => n.forTech === (currentSession.techId || currentSession.id) || n.forTech === null);
     } else {
       notifications = appState.notifs || [];
+=======
+      notifications = appState.notifs.filter(n => n.forGr === currentSession.grNo || n.forGr === null);
+    } else if (currentSession.role === 'faculty') {
+      notifications = appState.notifs.filter(n => n.forDept === currentSession.dept || n.forDept === null);
+    } else if (currentSession.role === 'technician') {
+      notifications = appState.notifs.filter(n => n.forTech === currentSession.techId || n.forTech === null);
+    } else {
+      notifications = appState.notifs;
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     }
   }
 
@@ -827,6 +844,7 @@ async function renderNotifs() {
 async function markAllRead() {
   if (!currentSession) return;
   try {
+<<<<<<< HEAD
     let payload = {};
     if (currentSession.role === 'student' && currentSession.grNo) {
       payload = { gr: currentSession.grNo, role: 'student' };
@@ -843,6 +861,9 @@ async function markAllRead() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+=======
+    await fetch('backend/notifications/read_all.php', { method: 'POST' });
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
   } catch (e) {}
 
   (appState.notifs || []).forEach(n => {

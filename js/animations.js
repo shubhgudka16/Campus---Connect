@@ -381,6 +381,7 @@
     }
   };
 
+<<<<<<< HEAD
   /* ---------- DOM READY INITIALIZATION ---------- */
   document.addEventListener('DOMContentLoaded', () => {
     refreshAnimatedElements();
@@ -394,5 +395,32 @@
       wakeScrollEngine();
     }, 400);
   });
+=======
+/* ---------- LANDING STATS & USER STATE RENDERER ---------- */
+async function renderLandingStats() {
+  if (typeof appState === 'undefined') return;
+
+  if (!appState.complaints || appState.complaints.length === 0) {
+    try {
+      const res = await fetch('backend/complaints/list.php?public=1');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        appState.complaints = data.data;
+      }
+    } catch (e) {}
+  }
+
+  const total = (appState.complaints || []).length;
+  const cleared = (appState.complaints || []).filter(c => c.status === 'Completed' || c.status === 'Perfectly Completed' || c.stage === 7).length;
+  
+  const statTotal = document.getElementById('lStatTotal');
+  const statCleared = document.getElementById('lStatCleared');
+  
+  if (statTotal) animateValue(statTotal, 0, total, 1000);
+  if (statCleared) {
+    const pct = total ? Math.round((cleared / total) * 100) + '%' : '100%';
+    animateValue(statCleared, 0, pct, 1200);
+  }
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 
 })();

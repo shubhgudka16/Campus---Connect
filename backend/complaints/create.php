@@ -121,6 +121,10 @@ $createdComplaint = [
     ]
 ];
 
+<<<<<<< HEAD
 sendJson(true, "Complaint $ticketId registered & routed to Admin queue.", array_merge($createdComplaint, [
     'complaint' => $createdComplaint
 ]), 201);
+=======
+sendJson(true, "Complaint $ticketId registered & routed to Admin queue.", $createdComplaint, 201);
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e

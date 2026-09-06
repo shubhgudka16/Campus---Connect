@@ -23,8 +23,12 @@ if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
 }
 
 // Database Credentials
+<<<<<<< HEAD
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
+=======
+define('DB_HOST', 'localhost');
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 define('DB_NAME', 'campus_connect');
 define('DB_USER', 'root');
 define('DB_PASS', '');
@@ -35,17 +39,22 @@ define('DB_PASS', '');
 function getDbConnection(): PDO {
     static $pdo = null;
     if ($pdo === null) {
+<<<<<<< HEAD
         $host = DB_HOST;
         $port = DB_PORT;
         $dbname = DB_NAME;
         $user = DB_USER;
         $pass = DB_PASS;
 
+=======
+        $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
         $options = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
         ];
+<<<<<<< HEAD
 
         // Primary attempt
         try {
@@ -67,6 +76,12 @@ function getDbConnection(): PDO {
                     500
                 );
             }
+=======
+        try {
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        } catch (PDOException $e) {
+            sendJson(false, 'Database connection failed: ' . $e->getMessage(), null, 500);
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
         }
     }
     return $pdo;

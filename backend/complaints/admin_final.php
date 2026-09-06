@@ -44,6 +44,7 @@ if (!empty($c['tech_id'])) {
     $techStmt->execute([$c['tech_id']]);
 }
 
+<<<<<<< HEAD
 // Check if student completion notification already exists to prevent duplicates
 $studentNotifStmt = $db->prepare("SELECT id FROM notifications WHERE for_gr = ? AND complaint_id = ? AND text LIKE '%Completed%'");
 $studentNotifStmt->execute([$c['reported_by_gr'], $id]);
@@ -57,6 +58,11 @@ if (!empty($c['tech_id'])) {
     if (!$techNotifStmt->fetch()) {
         addNotification($db, null, null, $c['tech_id'], 'technician', $id, "Task $id has received final Admin sign-off and is officially Completed ✅.", $now);
     }
+=======
+addNotification($db, $c['reported_by_gr'], null, null, null, $id, "Your complaint $id has been verified by Admin and is now Completed ✅.", $now);
+if (!empty($c['tech_id'])) {
+    addNotification($db, null, null, $c['tech_id'], 'technician', $id, "Task $id has received final Admin sign-off and is officially Completed ✅.", $now);
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 }
 
 sendJson(true, "Complaint $id verified and marked Completed ✅!", [

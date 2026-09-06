@@ -147,6 +147,7 @@ async function submitComplaint(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+<<<<<<< HEAD
 
     if (!res.ok) {
       let errData = null;
@@ -192,6 +193,48 @@ async function submitComplaint(e) {
       await renderStudent(true);
     } else if (typeof renderByRole === 'function') {
       await renderByRole();
+=======
+    const data = await res.json();
+
+    if (!data.success) {
+      return toast(data.message || 'Failed to submit complaint.', 'err');
+    }
+
+    const created = data.data;
+    if (!appState.complaints) appState.complaints = [];
+    appState.complaints.unshift(created);
+    persist();
+
+    closeComplaintModal();
+
+    // Reset form inputs
+    const titleInput = document.getElementById('cTitle');
+    if (titleInput) titleInput.value = '';
+    const locInput = document.getElementById('cLocation');
+    if (locInput) locInput.value = '';
+    const descInput = document.getElementById('cDesc');
+    if (descInput) descInput.value = '';
+
+    tmpBase64Image = null;
+    tmpBase64Video = null;
+    const imgPreview = document.getElementById('imgUploadPreview');
+    if (imgPreview) imgPreview.classList.add('hidden');
+    const imgBtn = document.getElementById('imgPlaceholderBtn');
+    if (imgBtn) imgBtn.classList.remove('hidden');
+    const vidPreview = document.getElementById('videoUploadPreview');
+    if (vidPreview) vidPreview.classList.add('hidden');
+    const vidBtn = document.getElementById('videoPlaceholderBtn');
+    if (vidBtn) vidBtn.classList.remove('hidden');
+    const priorityAlert = document.getElementById('priorityDetectAlert');
+    if (priorityAlert) priorityAlert.classList.add('hidden');
+
+    toast(`Complaint ${created.id} registered & routed to Admin queue.`);
+
+    if (typeof renderStudent === 'function' && typeof currentSession !== 'undefined' && currentSession && currentSession.role === 'student') {
+      renderStudent();
+    } else if (typeof renderByRole === 'function') {
+      renderByRole();
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     }
     if (typeof renderLandingStats === 'function') {
       renderLandingStats();
@@ -200,8 +243,12 @@ async function submitComplaint(e) {
       renderPublicFeed();
     }
   } catch (err) {
+<<<<<<< HEAD
     console.error('Error submitting complaint:', err);
     toast('Unable to save complaint. Please try again.', 'err');
+=======
+    toast('Error submitting complaint. Please try again.', 'err');
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
   }
 }
 

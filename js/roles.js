@@ -453,7 +453,11 @@ async function submitStudentFeedback(id, feedback, comment = '') {
     }
 
     persist();
+<<<<<<< HEAD
     await renderStudent(true);
+=======
+    renderStudent();
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
   } catch (err) {
     toast('Error saving feedback.', 'err');
   }

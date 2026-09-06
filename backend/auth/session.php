@@ -29,10 +29,13 @@ $session['dept'] = $user['department'];
 $session['avatar'] = $user['avatar'];
 $session['warned'] = (bool)$user['is_warned'];
 $session['suspended'] = (bool)$user['is_suspended'];
+<<<<<<< HEAD
 if ($user['role'] === 'technician') {
     $session['experience'] = (int)($user['experience'] ?? 0);
     $session['rating'] = (float)($user['rating'] ?? 5.0);
 }
+=======
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 
 $_SESSION['campus_session'] = $session;
 

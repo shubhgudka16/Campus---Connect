@@ -113,9 +113,12 @@ if ($user['role'] === 'student') {
     $sessionUser['grNo'] = $user['identifier'];
 } elseif ($user['role'] === 'technician') {
     $sessionUser['techId'] = $user['identifier'];
+<<<<<<< HEAD
     $sessionUser['id'] = $user['identifier'];
     $sessionUser['experience'] = (int)($user['experience'] ?? 0);
     $sessionUser['rating'] = (float)($user['rating'] ?? 5.0);
+=======
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 } elseif ($user['role'] === 'admin') {
     $sessionUser['username'] = $user['identifier'];
 }

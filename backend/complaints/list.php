@@ -17,6 +17,7 @@ $category = trim($data['category'] ?? $data['dept'] ?? '');
 $statusFilter = trim($data['status'] ?? '');
 $isPublic = ($filterRole === 'public' || isset($data['public']));
 
+<<<<<<< HEAD
 // Enforce authentication for student, faculty, technician, and admin roles
 if (!$isPublic) {
     if (!$currentUser) {
@@ -35,6 +36,17 @@ if (!$isPublic && $currentUser) {
         $query .= " AND (c.reported_by_gr = ? OR c.reported_by = ?)";
         $params[] = $studentGr;
         $params[] = $studentName;
+=======
+$query = "SELECT c.* FROM complaints c WHERE 1=1";
+$params = [];
+
+// Role-based scoping
+if (!$isPublic && $currentUser) {
+    if ($currentUser['role'] === 'student') {
+        $query .= " AND (c.reported_by_gr = ? OR c.reported_by = ?)";
+        $params[] = $currentUser['grNo'];
+        $params[] = $currentUser['name'];
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
     } elseif ($currentUser['role'] === 'faculty') {
         if (!empty($currentUser['dept'])) {
             $query .= " AND (c.category = ? OR c.category = '') AND c.stage >= 2 AND c.status != 'Rejected by Admin'";
@@ -48,7 +60,11 @@ if (!$isPublic && $currentUser) {
         $params[] = $techId;
         $params[] = $currentUser['dept'] ?? '';
     }
+<<<<<<< HEAD
     // Admin role has unrestricted visibility of all complaints
+=======
+    // Admin sees all complaints
+>>>>>>> baf232aab9c275c023da3aba876ce3c025ea996e
 }
 
 // Category filter
