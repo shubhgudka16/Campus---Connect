@@ -134,6 +134,11 @@ function syncNavProfile() {
     chip.classList.remove('hidden');
     chip.classList.add('flex');
     if (notifWrap) notifWrap.classList.remove('hidden');
+    if (typeof startNotificationPolling === 'function') {
+      startNotificationPolling();
+    } else if (typeof renderNotifs === 'function') {
+      renderNotifs();
+    }
 
     if (chipName) chipName.textContent = currentSession.name;
     if (chipRole) {
@@ -157,6 +162,8 @@ function syncNavProfile() {
     chip.classList.add('hidden');
     chip.classList.remove('flex');
     if (notifWrap) notifWrap.classList.add('hidden');
+    const notifDot = document.getElementById('notifDot');
+    if (notifDot) notifDot.classList.add('hidden');
   }
 }
 

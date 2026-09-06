@@ -1,0 +1,10 @@
+# Prevent execution of any scripts in the uploads folder
+<FilesMatch "(?i)\.(php|phtml|php3|php4|php5|php7|phps|cgi|pl|py|exe|sh)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Allow media streaming and images
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>

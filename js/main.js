@@ -538,12 +538,19 @@ let tmpBase64ProfileAvatar = null;
 let qaApprovalState = true;
 let sessionWatcherTimer = null;
 
-function logout(isAutoExpired = false) {
+async function logout(isAutoExpired = false) {
+  try {
+    await fetch('backend/auth/logout.php', { method: 'POST' });
+  } catch (e) {}
+
   currentSession = null;
   localStorage.removeItem('campus_session');
   localStorage.removeItem('campus_hidden_timestamp');
-  sessionStorage.removeItem('campus_session_active');
   if (sessionWatcherTimer) clearInterval(sessionWatcherTimer);
+  if (typeof notifPollingTimer !== 'undefined' && notifPollingTimer) {
+    clearInterval(notifPollingTimer);
+    notifPollingTimer = null;
+  }
 
   const timerBadge = document.getElementById('sessionTimerBadge');
   if (timerBadge) timerBadge.classList.add('hidden');
@@ -665,7 +672,7 @@ function handleProfileImgUpload(input) {
   }; r.readAsDataURL(file);
 }
 
-function saveProfile(e) {
+async function saveProfile(e) {
   e.preventDefault();
   const name = document.getElementById('profName').value.trim();
   const dept = document.getElementById('profDept').value.trim();
@@ -673,17 +680,42 @@ function saveProfile(e) {
   const url = document.getElementById('profImgUrl').value.trim();
   let finalAvatar = url || tmpBase64ProfileAvatar || null;
 
-  if (currentSession.role === 'student') {
-    const u = appState.users.find(x => x.grNo === currentSession.grNo);
-    if (u) { u.name = name; u.dept = dept; u.password = pass; u.avatar = finalAvatar; persist(); }
-    currentSession.name = name; currentSession.dept = dept; currentSession.avatar = finalAvatar;
-  } else if (currentSession.role === 'technician') {
-    const t = appState.technicians.find(x => x.id === currentSession.techId);
-    if (t) { t.name = name; t.dept = dept; t.password = pass; persist(); }
-    currentSession.name = name; currentSession.dept = dept;
+  try {
+    const res = await fetch('backend/profile/update.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        dept,
+        password: pass,
+        avatar: finalAvatar
+      })
+    });
+    const data = await res.json();
+    if (data.success && data.data && data.data.session) {
+      currentSession = data.data.session;
+      localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    } else {
+      if (currentSession.role === 'student') {
+        const u = appState.users.find(x => x.grNo === currentSession.grNo);
+        if (u) { u.name = name; u.dept = dept; u.password = pass; u.avatar = finalAvatar; persist(); }
+        currentSession.name = name; currentSession.dept = dept; currentSession.avatar = finalAvatar;
+      } else if (currentSession.role === 'technician') {
+        const t = appState.technicians.find(x => x.id === currentSession.techId);
+        if (t) { t.name = name; t.dept = dept; t.password = pass; persist(); }
+        currentSession.name = name; currentSession.dept = dept;
+      }
+      localStorage.setItem('campus_session', JSON.stringify(currentSession));
+    }
+  } catch (err) {
+    if (currentSession.role === 'student') {
+      const u = appState.users.find(x => x.grNo === currentSession.grNo);
+      if (u) { u.name = name; u.dept = dept; u.password = pass; u.avatar = finalAvatar; persist(); }
+      currentSession.name = name; currentSession.dept = dept; currentSession.avatar = finalAvatar;
+    }
+    localStorage.setItem('campus_session', JSON.stringify(currentSession));
   }
   
-  localStorage.setItem('campus_session', JSON.stringify(currentSession));
   closeProfileModal();
   toast('Profile updated successfully!');
   if (typeof syncNavProfile === 'function') syncNavProfile();
@@ -692,26 +724,78 @@ function saveProfile(e) {
 
 
 /* ---------- LIVE NOTIFICATIONS WORKSPACE ---------- */
-function toggleNotif() { document.getElementById('notifDrop').classList.toggle('hidden'); }
+let notifPollingTimer = null;
 
-function renderNotifs() {
+function toggleNotif() {
+  const drop = document.getElementById('notifDrop');
+  if (!drop) return;
+  const willOpen = drop.classList.contains('hidden');
+  drop.classList.toggle('hidden');
+  if (willOpen && typeof renderNotifs === 'function') {
+    renderNotifs();
+  }
+}
+
+function startNotificationPolling() {
+  if (notifPollingTimer) clearInterval(notifPollingTimer);
+  if (typeof currentSession !== 'undefined' && currentSession) {
+    renderNotifs();
+    notifPollingTimer = setInterval(() => {
+      if (typeof currentSession !== 'undefined' && currentSession) {
+        renderNotifs();
+      } else if (notifPollingTimer) {
+        clearInterval(notifPollingTimer);
+        notifPollingTimer = null;
+      }
+    }, 15000);
+  }
+}
+
+async function renderNotifs() {
   if (!currentSession) return;
   let notifications = [];
   
-  if (currentSession.role === 'student') {
-    notifications = appState.notifs.filter(n => n.forGr === currentSession.grNo || n.forGr === null);
-  } else if (currentSession.role === 'faculty') {
-    notifications = appState.notifs.filter(n => n.forDept === currentSession.dept || n.forDept === null);
-  } else if (currentSession.role === 'technician') {
-    notifications = appState.notifs.filter(n => n.forTech === currentSession.techId || n.forTech === null);
-  } else {
-    notifications = appState.notifs;
+  try {
+    let queryParam = '';
+    if (currentSession.role === 'student' && currentSession.grNo) {
+      queryParam = `?role=student&gr=${encodeURIComponent(currentSession.grNo)}`;
+    } else if (currentSession.role === 'faculty' && currentSession.dept) {
+      queryParam = `?role=faculty&dept=${encodeURIComponent(currentSession.dept)}`;
+    } else if (currentSession.role === 'technician') {
+      const techId = currentSession.techId || currentSession.id;
+      queryParam = `?role=technician&techId=${encodeURIComponent(techId || '')}`;
+    } else if (currentSession.role === 'admin') {
+      queryParam = `?role=admin`;
+    }
+
+    const res = await fetch(`backend/notifications/list.php${queryParam}`);
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      notifications = data.data;
+      appState.notifs = notifications;
+    } else {
+      notifications = appState.notifs || [];
+    }
+  } catch (e) {
+    if (currentSession.role === 'student') {
+      notifications = (appState.notifs || []).filter(n => n.forGr === currentSession.grNo || n.forGr === null);
+    } else if (currentSession.role === 'faculty') {
+      notifications = (appState.notifs || []).filter(n => n.forDept === currentSession.dept || n.forDept === null);
+    } else if (currentSession.role === 'technician') {
+      notifications = (appState.notifs || []).filter(n => n.forTech === (currentSession.techId || currentSession.id) || n.forTech === null);
+    } else {
+      notifications = appState.notifs || [];
+    }
   }
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  document.getElementById('notifDot').classList.toggle('hidden', unreadCount === 0);
+  const notifDot = document.getElementById('notifDot');
+  if (notifDot) {
+    notifDot.classList.toggle('hidden', unreadCount === 0);
+  }
 
   const container = document.getElementById('notifList');
+  if (!container) return;
   container.innerHTML = '';
   
   if (notifications.length === 0) {
@@ -719,24 +803,55 @@ function renderNotifs() {
     return;
   }
 
-  notifications.slice(0, 15).forEach(n => {
+  notifications.slice(0, 25).forEach(n => {
     const el = document.createElement('div');
-    el.className = `p-4 border-b text-xs ${!n.read ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`;
-    el.innerHTML = `<p class="font-medium">${n.text}</p><span class="text-[10px] text-slate-500 block mt-1">${n.time}</span>`;
+    const isUnread = !n.read;
+    el.className = `p-4 border-b border-slate-100 dark:border-zinc-800 text-xs transition-colors ${
+      isUnread 
+        ? 'bg-blue-50/70 dark:bg-blue-950/30 border-l-4 border-l-blue-600 font-semibold' 
+        : 'text-slate-600 dark:text-zinc-300'
+    }`;
+    el.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <p class="leading-relaxed ${isUnread ? 'text-slate-900 dark:text-white font-bold' : ''}">
+          ${n.text}
+        </p>
+        ${isUnread ? '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-blue-600 text-white font-bold tracking-wider">NEW</span>' : ''}
+      </div>
+      <span class="text-[10px] text-slate-400 dark:text-zinc-500 block mt-1.5">${n.time}</span>
+    `;
     container.appendChild(el);
   });
 }
 
-function markAllRead() {
+async function markAllRead() {
   if (!currentSession) return;
-  appState.notifs.forEach(n => {
-    if (currentSession.role === 'student' && (n.forGr === currentSession.grNo || n.forGr === null)) n.read = true;
-    if (currentSession.role === 'faculty' && (n.forDept === currentSession.dept || n.forDept === null)) n.read = true;
-    if (currentSession.role === 'technician' && (n.forTech === currentSession.techId || n.forTech === null)) n.read = true;
-    if (currentSession.role === 'admin') n.read = true;
+  try {
+    let payload = {};
+    if (currentSession.role === 'student' && currentSession.grNo) {
+      payload = { gr: currentSession.grNo, role: 'student' };
+    } else if (currentSession.role === 'faculty') {
+      payload = { dept: currentSession.dept, role: 'faculty' };
+    } else if (currentSession.role === 'technician') {
+      payload = { techId: currentSession.techId || currentSession.id, role: 'technician' };
+    } else if (currentSession.role === 'admin') {
+      payload = { role: 'admin' };
+    }
+
+    await fetch('backend/notifications/read_all.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {}
+
+  (appState.notifs || []).forEach(n => {
+    n.read = true;
   });
   persist();
-  renderNotifs();
+  const notifDot = document.getElementById('notifDot');
+  if (notifDot) notifDot.classList.add('hidden');
+  await renderNotifs();
   toast('Notifications marked read.');
 }
 
